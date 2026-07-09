@@ -76,8 +76,9 @@ def write_png_metadata(paths, config):
             logger.warning(f"PNG metadata write failed for {p}: {e}")
 
 class AutomationManager:
-    def __init__(self, get_engine_url_fn):
+    def __init__(self, get_engine_url_fn, ensure_service_fn=None):
         self.get_engine_url = get_engine_url_fn
+        self.ensure_service = ensure_service_fn
         self.automation_status = {
             "is_running": False,
             "mode": "rounds",
@@ -167,10 +168,15 @@ class AutomationManager:
         
     async def _run_loop(self):
         try:
+            if self.ensure_service:
+                ok = await self.ensure_service()
+                if not ok:
+                    logger.error("Engine service could not be started; aborting automation run.")
+                    return
             self._session_lost = False
             while self.automation_status["is_running"]:
                 if self._session_lost:
-                    logger.debug("Session lost detected. Aborting loop.")
+                    logger.warning("Session lost detected. Aborting loop.")
                     break
                     
                 if self._stop_event.is_set():
@@ -194,6 +200,8 @@ class AutomationManager:
                     self._lc_cycle_start_time = time.time()
                 
                 is_initial = (cycles == 0) or self._needs_new_chat
+                if is_initial and self.ensure_service:
+                    await self.ensure_service()
                 
                 try:
                     if is_initial:
@@ -250,7 +258,7 @@ class AutomationManager:
                                         logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
                                         tool_to_apply = None
                             else:
-                                logger.debug(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
+                                logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
                             
                             await self._post("/browser/apply_settings", {
                                 "model": model_to_apply,
@@ -371,10 +379,15 @@ class AutomationManager:
                             self._record_reset()
                     elif status == "timeout":
                         self._record_reset()
+                    elif status == "reset":
+                        self._record_reset()
+                    else:
+                        logger.warning(f"Unhandled wait status: {status}; treating as reset")
+                        self._record_reset()
                         
                     await asyncio.sleep(2)
                 except Exception as e:
-                    logger.debug(f"Recoverable error: {e}")
+                    logger.warning(f"Recoverable cycle error: {e}", exc_info=True)
                     self._record_reset()
                     
         except Exception as e:

@@ -127,7 +127,7 @@ from pydantic import BaseModel
 from fastapi import Body
 from automation import AutomationManager, load_refused_keywords, save_refused_keywords, load_quota_keywords, save_quota_keywords
 
-automation_manager = AutomationManager(get_engine_url)
+automation_manager = AutomationManager(get_engine_url, ensure_service)
 
 class AutomationRequest(BaseModel):
     mode: str = "rounds"
