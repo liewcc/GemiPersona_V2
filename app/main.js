@@ -591,7 +591,8 @@ if (!gotTheLock) {
     }
 
     startEngine();
-    createTray();
+    // Tray is non-essential; a tray/icon failure must never block window creation.
+    try { createTray(); } catch (e) { console.error('createTray failed (non-fatal):', e); }
     createWindow();
 
     app.on('activate', function () {

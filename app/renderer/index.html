@@ -60,7 +60,7 @@
 
             while (attempts < maxAttempts) {
                 try {
-                    const response = await fetch('http://127.0.0.1:18000/health');
+                    const response = await fetch('http://127.0.0.1:18101/health');
                     if (response.ok) {
                         const data = await response.json();
                         statusText.textContent = "Engine Ready. Loading Setup...";

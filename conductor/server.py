@@ -8,6 +8,7 @@ import subprocess
 import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Setup logging
@@ -24,6 +25,17 @@ logging.basicConfig(
 logger = logging.getLogger('conductor')
 
 app = FastAPI()
+
+# The Electron renderer loads via file:// (Origin: null) and calls this API over
+# http://127.0.0.1:18101 — a cross-origin request. Without CORS headers Chromium
+# blocks the response and every api.js fetch fails. Allow all origins (local app).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _registered_service_pid = None
 
