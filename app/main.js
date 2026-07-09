@@ -587,7 +587,7 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     // Set app user model ID for Windows notifications to work properly
     if (process.platform === 'win32') {
-      app.setAppUserModelId('Gemipersona Pro');
+      app.setAppUserModelId('com.liewcc.gemipersona.v2');
     }
 
     startEngine();
