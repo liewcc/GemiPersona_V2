@@ -331,6 +331,57 @@ async def attach_files_ep(file_paths: list = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=502, content={"detail": str(e)})
 
+async def _rotate_profile(direction: int):
+    """Switch to the next (direction=+1) or previous (-1) Chrome profile.
+    Order comes from the engine's /engine/profiles; current profile is matched by
+    email against /browser/account's account_id. Falls back to the first profile
+    when the current one can't be determined."""
+    base = get_engine_url()
+
+    def _norm(v):
+        return (v or "").split("@")[0].lower().strip()
+
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            pr = await client.get(base + "/engine/profiles")
+            profiles = pr.json().get("profiles", []) if pr.status_code == 200 else []
+            if not profiles:
+                return JSONResponse(status_code=400, content={"detail": "No profiles found"})
+
+            current_email = None
+            try:
+                ar = await client.get(base + "/browser/account")
+                if ar.status_code == 200:
+                    current_email = (ar.json() or {}).get("account_id")
+            except Exception:
+                pass
+
+            idx = -1
+            if current_email:
+                nc = _norm(current_email)
+                for i, p in enumerate(profiles):
+                    if _norm(p.get("email")) == nc:
+                        idx = i
+                        break
+
+            n = len(profiles)
+            target = profiles[0] if idx == -1 else profiles[(idx + direction) % n]
+            target_email = target.get("email")
+
+            sr = await client.post(base + "/engine/switch_account", json={"username": target_email})
+        return Response(content=sr.content, status_code=sr.status_code,
+                        media_type=sr.headers.get("content-type"))
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": str(e)})
+
+@app.post("/engine/switch_profile")
+async def switch_profile_ep(h: bool = None):
+    return await _rotate_profile(1)
+
+@app.post("/engine/switch_profile_previous")
+async def switch_profile_previous_ep(h: bool = None):
+    return await _rotate_profile(-1)
+
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
 async def proxy_to_engine(request: Request, path: str):
