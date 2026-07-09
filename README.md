@@ -1,0 +1,1 @@
+GemiPersona V2 — Electron-based persona image generation app built on the Gemi_Engine_V2 atomic browser engine. Conductor layer (automation, image post-processing, health analytics) and Electron UI to be added in later phases. Engine runs on port 18000.

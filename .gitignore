@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Local runtime state / logs (contains personal account info)
+config.json
+engine_config.json
+engine.log
+pythonw_out.txt
+Gemi_Engine_V2/dom_dumps/
+node_modules/
+browser_user_data/
+browser_session_sandbox/
