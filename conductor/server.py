@@ -123,6 +123,68 @@ async def health_check():
     
     return {"conductor": "ok", "engine": engine_health}
 
+from pydantic import BaseModel
+from fastapi import Body
+from automation import AutomationManager, load_refused_keywords, save_refused_keywords, load_quota_keywords, save_quota_keywords
+
+automation_manager = AutomationManager(get_engine_url)
+
+class AutomationRequest(BaseModel):
+    mode: str = "rounds"
+    goal: int = 100
+    config: dict = {}
+    clear_pending: bool = True
+
+@app.post("/browser/automation/start")
+async def start_automation(req: AutomationRequest):
+    automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    return {"status": "success"}
+
+@app.post("/browser/automation/continue")
+async def continue_automation(req: AutomationRequest):
+    req.clear_pending = False
+    automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    return {"status": "success"}
+
+@app.post("/browser/automation/stop")
+async def stop_automation():
+    automation_manager.stop()
+    return {"status": "success"}
+
+@app.post("/browser/automation/request_new_chat")
+async def request_new_chat():
+    automation_manager.request_new_chat()
+    return {"status": "success"}
+
+@app.get("/browser/automation/stats")
+async def get_automation_stats():
+    return automation_manager.automation_status
+
+@app.get("/engine/refused_keywords")
+async def get_refused_keywords_ep():
+    return {"keywords": load_refused_keywords()}
+
+@app.post("/engine/refused_keywords")
+async def save_refused_keywords_ep(data: dict = Body(...)):
+    keywords = data.get("keywords", [])
+    save_refused_keywords(keywords)
+    return {"status": "success", "count": len(keywords)}
+
+@app.get("/engine/quota_keywords")
+async def get_quota_keywords_ep():
+    return {"keywords": load_quota_keywords()}
+
+@app.post("/engine/quota_keywords")
+async def save_quota_keywords_ep(data: dict = Body(...)):
+    keywords = data.get("keywords", [])
+    save_quota_keywords(keywords)
+    return {"status": "success", "count": len(keywords)}
+
+@app.post("/engine/reset_time_timer")
+async def reset_time_timer():
+    automation_manager.reset_time_timer()
+    return {"status": "success"}
+
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
 async def proxy_to_engine(request: Request, path: str):

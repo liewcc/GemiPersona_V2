@@ -1,0 +1,411 @@
+import asyncio
+import time
+import httpx
+import os
+import json
+import logging
+import traceback
+
+logger = logging.getLogger('conductor')
+
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+REFUSED_FILE = os.path.join(DATA_DIR, "refused_keywords.json")
+QUOTA_FILE = os.path.join(DATA_DIR, "quota_full_keywords.json")
+
+def load_keywords(filepath):
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_keywords(filepath, keywords):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(keywords, f, indent=4, ensure_ascii=False)
+
+def load_refused_keywords():
+    return load_keywords(REFUSED_FILE)
+
+def save_refused_keywords(keywords):
+    save_keywords(REFUSED_FILE, keywords)
+    return True
+
+def load_quota_keywords():
+    return load_keywords(QUOTA_FILE)
+
+def save_quota_keywords(keywords):
+    save_keywords(QUOTA_FILE, keywords)
+    return True
+
+def classify_text(text: str) -> str:
+    if not text:
+        return "error"
+    text_lower = text.lower()
+    
+    quota_kw = load_keywords(QUOTA_FILE)
+    for kw in quota_kw:
+        if kw.lower() in text_lower:
+            return "quota"
+            
+    refused_kw = load_keywords(REFUSED_FILE)
+    for kw in refused_kw:
+        if kw.lower() in text_lower:
+            return "refused"
+            
+    return "success"
+
+def write_png_metadata(paths, config):
+    """Re-save downloaded PNGs with whitelisted provenance metadata."""
+    from PIL import Image, PngImagePlugin
+    fields = {
+        "aspect_ratio": config.get("aspect_ratio", ""),
+        "prompt": config.get("prompt_clean", config.get("prompt", "")),
+        "url": config.get("browser_url", ""),
+        "upload_path": ", ".join(config.get("selected_files") or []),
+    }
+    for p in paths:
+        try:
+            with Image.open(p) as img:
+                meta = PngImagePlugin.PngInfo()
+                for k in ("aspect_ratio", "prompt", "url", "upload_path"):
+                    v = fields.get(k) or img.info.get(k, "")
+                    if v:
+                        meta.add_text(k, str(v))
+                img.save(p, "PNG", pnginfo=meta)
+        except Exception as e:
+            logger.warning(f"PNG metadata write failed for {p}: {e}")
+
+class AutomationManager:
+    def __init__(self, get_engine_url_fn):
+        self.get_engine_url = get_engine_url_fn
+        self.automation_status = {
+            "is_running": False,
+            "mode": "rounds",
+            "goal": 0,
+            "cycles": 0,
+            "successes": 0,
+            "refusals": 0,
+            "resets": 0,
+            "pending_refused": 0,
+            "pending_resets": 0,
+            "current_account_id": None,
+            "initial_user": None,
+            "start_time": None,
+            "current_cycle_start_ts": None,
+            "inter_cycle_start_ts": None
+        }
+        self.config = {}
+        self._stop_event = asyncio.Event()
+        self._task = None
+        
+        self._cycle_start_time = None
+        self._lc_cycle_start_time = None
+        
+        self._pending_refused = 0
+        self._pending_resets = 0
+        self._lc_pending_refused = 0
+        self._lc_pending_resets = 0
+        
+        self._lc_time_threshold_start_time = None
+        self._needs_new_chat = True
+        self._session_lost = False
+        
+    async def _post(self, path, json_data=None):
+        url = self.get_engine_url() + path
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            return await client.post(url, json=json_data)
+
+    async def _get(self, path):
+        url = self.get_engine_url() + path
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            return await client.get(url)
+
+    def start(self, mode: str, goal: int, config: dict, clear_pending: bool):
+        if self.automation_status["is_running"]:
+            return
+            
+        self._stop_event.clear()
+        
+        self.automation_status.update({
+            "is_running": True,
+            "mode": mode,
+            "goal": goal,
+            "cycles": 0 if clear_pending else self.automation_status.get("cycles", 0),
+            "successes": 0 if clear_pending else self.automation_status.get("successes", 0),
+            "refusals": 0 if clear_pending else self.automation_status.get("refusals", 0),
+            "resets": 0 if clear_pending else self.automation_status.get("resets", 0)
+        })
+        
+        if clear_pending:
+            self._pending_refused = 0
+            self._pending_resets = 0
+            self.automation_status["pending_refused"] = 0
+            self.automation_status["pending_resets"] = 0
+            self._lc_pending_refused = 0
+            self._lc_pending_resets = 0
+            self._lc_time_threshold_start_time = time.time()
+            
+        self.config = config
+        
+        if self.automation_status.get("start_time") is None or clear_pending:
+            from datetime import datetime
+            self.automation_status["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        self.automation_status["initial_user"] = config.get("active_user")
+        self.automation_status["current_account_id"] = config.get("active_user")
+            
+        self._task = asyncio.create_task(self._run_loop())
+
+    def stop(self):
+        self._stop_event.set()
+
+    def request_new_chat(self):
+        self._needs_new_chat = True
+        
+    def reset_time_timer(self):
+        self._lc_time_threshold_start_time = time.time()
+        
+    async def _run_loop(self):
+        try:
+            self._session_lost = False
+            while self.automation_status["is_running"]:
+                if self._session_lost:
+                    logger.debug("Session lost detected. Aborting loop.")
+                    break
+                    
+                if self._stop_event.is_set():
+                    break
+                    
+                mode = self.automation_status.get("mode", "rounds")
+                goal = self.automation_status.get("goal", 0)
+                cycles = self.automation_status.get("cycles", 0)
+                successes = self.automation_status.get("successes", 0)
+                
+                if mode == "rounds" and cycles >= goal:
+                    break
+                if mode == "images" and successes >= goal:
+                    break
+                    
+                if self._cycle_start_time is None:
+                    self._cycle_start_time = time.time()
+                    self.automation_status["current_cycle_start_ts"] = self._cycle_start_time
+                    self.automation_status["inter_cycle_start_ts"] = None
+                if self._lc_cycle_start_time is None:
+                    self._lc_cycle_start_time = time.time()
+                
+                is_initial = (cycles == 0) or self._needs_new_chat
+                
+                try:
+                    if is_initial:
+                        await self._post("/engine/start", {"headless": False, "active_user": self.automation_status["current_account_id"], "active_service": "gemini"})
+                        await self._post("/browser/new_chat", {})
+                        if self._stop_event.is_set(): break
+                        await asyncio.sleep(2)
+                        
+                        await self._post("/browser/prompt", {"text": self.config.get("prompt", "")})
+                        if self._stop_event.is_set(): break
+                        
+                        await self._post("/browser/submit", {})
+                        if self._stop_event.is_set(): break
+                        self._needs_new_chat = False
+                    else:
+                        redo_resp = await self._post("/browser/redo", {})
+                        if redo_resp.status_code != 200 or redo_resp.json().get("status") != "success":
+                            self._record_reset()
+                            continue
+                    
+                    wait_resp = await self._post("/browser/wait_response", {"timeout": 180})
+                    wait_data = wait_resp.json()
+                    
+                    status = wait_data.get("status")
+                    if status == "done":
+                        if wait_data.get("has_image"):
+                            dl_cfg = {
+                                "save_dir": self.config.get("save_dir", ""),
+                                "prefix": self.config.get("name_prefix", ""),
+                                "padding": self.config.get("name_padding", 2),
+                                "start": self.config.get("name_start", 1)
+                            }
+                            dl_resp = await self._post("/browser/download", dl_cfg)
+                            dl_data = dl_resp.json()
+                            
+                            if dl_data.get("status") == "success":
+                                saved_paths = dl_data.get("saved_paths", [])
+                                if saved_paths:
+                                    write_png_metadata(saved_paths, self.config)
+                                    self.config["name_start"] = dl_data.get("next_start", dl_cfg["start"])
+                                    self.automation_status["successes"] += 1
+                                    self.automation_status["cycles"] += 1
+                                    
+                                    if self.config.get("remove_watermark"):
+                                        try:
+                                            import processing_utils
+                                            from PIL import Image
+                                            processor = processing_utils.get_shared_processor()
+                                            for p in saved_paths:
+                                                img = Image.open(p)
+                                                out_img = processor.hybrid_process(img)
+                                                processing_utils.save_with_metadata(out_img, img, p)
+                                        except ModuleNotFoundError:
+                                            logger.warning("processing_utils not found, skipping watermark removal.")
+                                        except Exception as e:
+                                            logger.warning(f"Watermark removal failed: {e}")
+                                    
+                                    cycle_dur = time.time() - self._cycle_start_time
+                                    lc_dur = time.time() - self._lc_cycle_start_time
+                                    
+                                    cycle_refused_snap = self._pending_refused
+                                    cycle_resets_snap = self._pending_resets
+                                    lc_refused_snap = self._lc_pending_refused
+                                    lc_resets_snap = self._lc_pending_resets
+                                    
+                                    self._pending_refused = 0
+                                    self._pending_resets = 0
+                                    self.automation_status["pending_refused"] = 0
+                                    self.automation_status["pending_resets"] = 0
+                                    
+                                    self._cycle_start_time = None
+                                    self.automation_status["current_cycle_start_ts"] = None
+                                    self.automation_status["inter_cycle_start_ts"] = time.time()
+                                    
+                                    self._lc_pending_refused = 0
+                                    self._lc_pending_resets = 0
+                                    self._lc_cycle_start_time = None
+                                    
+                                    result = {
+                                        "cycle_duration_sec": cycle_dur,
+                                        "cycle_refused": cycle_refused_snap,
+                                        "cycle_resets": cycle_resets_snap,
+                                        "time_threshold_duration_sec": time.time() - (self._lc_time_threshold_start_time or time.time())
+                                    }
+                                    
+                                    loop_ctrl = self.config.get("automation", {}).get("loop_control", {})
+                                    switch, action = self._check_loop_control_thresholds(loop_ctrl, result)
+                                    if switch:
+                                        await self._handle_switch_action(action)
+                                else:
+                                    self._record_reset()
+                            else:
+                                self._record_reset()
+                        else:
+                            resp_data = await self._get("/browser/last_response")
+                            text = resp_data.json().get("text", "")
+                            cls_status = classify_text(text)
+                            if cls_status == "refused":
+                                self.automation_status["cycles"] += 1
+                                self.automation_status["refusals"] += 1
+                                self._pending_refused += 1
+                                self.automation_status["pending_refused"] = self._pending_refused
+                                self._lc_pending_refused += 1
+                            elif cls_status == "quota":
+                                await self._handle_quota()
+                            else:
+                                self._record_reset()
+                    elif status == "error":
+                        if "quota" in str(wait_data.get("message", "")).lower():
+                            await self._handle_quota()
+                        else:
+                            self._record_reset()
+                    elif status == "timeout":
+                        self._record_reset()
+                        
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    logger.debug(f"Recoverable error: {e}")
+                    self._record_reset()
+                    
+        except Exception as e:
+            logger.error(f"Automation loop error: {traceback.format_exc()}")
+        finally:
+            self.automation_status["is_running"] = False
+
+    def _record_reset(self):
+        self.automation_status["resets"] += 1
+        self.automation_status["cycles"] += 1
+        self._pending_resets += 1
+        self.automation_status["pending_resets"] = self._pending_resets
+        self._lc_pending_resets += 1
+        self._needs_new_chat = True
+        
+    def _check_loop_control_thresholds(self, loop_ctrl: dict, result: dict):
+        if not loop_ctrl:
+            return False, "next_profile"
+
+        dur_min = result.get("cycle_duration_sec", 0) / 60.0
+        time_dur_min = result.get("time_threshold_duration_sec", 0) / 60.0
+        refused = result.get("cycle_refused", 0)
+        resets = result.get("cycle_resets", 0)
+
+        if loop_ctrl.get("time_enabled") and time_dur_min >= loop_ctrl.get("time_minutes", 999):
+            return True, loop_ctrl.get("time_action", "next_profile")
+        if loop_ctrl.get("refused_enabled") and refused >= loop_ctrl.get("refused_threshold", 999):
+            return True, loop_ctrl.get("refused_action", "next_profile")
+        if loop_ctrl.get("reset_enabled") and resets >= loop_ctrl.get("reset_threshold", 999):
+            return True, loop_ctrl.get("reset_action", "next_profile")
+
+        return False, "next_profile"
+        
+    async def _handle_switch_action(self, action):
+        self._lc_time_threshold_start_time = time.time()
+        if action == "next_profile":
+            await self._switch_to_next_profile()
+        elif action == "re_login":
+            await self._post("/engine/re_login", {})
+            self._needs_new_chat = True
+
+    async def _switch_to_next_profile(self):
+        resp = await self._get("/engine/profiles")
+        profiles = resp.json().get("profiles", [])
+        if not profiles:
+            return
+            
+        cur = self.automation_status["current_account_id"]
+        idx = -1
+        for i, p in enumerate(profiles):
+            if p.get("email") == cur or p.get("name") == cur:
+                idx = i
+                break
+        
+        next_idx = (idx + 1) % len(profiles)
+        next_user = profiles[next_idx].get("email") or profiles[next_idx].get("name")
+        
+        await self._post("/engine/switch_account", {"username": next_user})
+        self.automation_status["current_account_id"] = next_user
+        self._needs_new_chat = True
+
+    async def _handle_quota(self):
+        await self._post("/engine/stop", {})
+        
+        resp = await self._get("/engine/profiles")
+        profiles = resp.json().get("profiles", [])
+        
+        cur = self.automation_status["current_account_id"]
+        idx = -1
+        for i, p in enumerate(profiles):
+            if p.get("email") == cur or p.get("name") == cur:
+                idx = i
+                break
+        
+        next_idx = (idx + 1) % len(profiles)
+        next_user = profiles[next_idx].get("email") or profiles[next_idx].get("name")
+        
+        initial = self.automation_status["initial_user"]
+        
+        if next_user == initial:
+            loop_ctrl = self.config.get("automation", {}).get("loop_control", {})
+            inf_en = loop_ctrl.get("infinite_loop_enabled", False)
+            if not inf_en:
+                self._session_lost = True
+                return
+            else:
+                sleep_min = loop_ctrl.get("infinite_loop_minutes", 60)
+                for _ in range(int(sleep_min * 60)):
+                    if self._stop_event.is_set():
+                        break
+                    await asyncio.sleep(1)
+                if self._stop_event.is_set():
+                    return
+        
+        await self._post("/engine/switch_account", {"username": next_user})
+        self.automation_status["current_account_id"] = next_user
+        self._needs_new_chat = True
