@@ -202,6 +202,69 @@ class AutomationManager:
                         if self._stop_event.is_set(): break
                         await asyncio.sleep(2)
                         
+                        try:
+                            logger.debug("Performing live discovery scan at new chat...")
+                            discovery_resp = await self._post("/browser/discover")
+                            discovery_res = discovery_resp.json()
+                            
+                            sel_model = self.config.get("selected_model")
+                            sel_tool = self.config.get("selected_tool")
+                            sel_sub_tool = self.config.get("selected_sub_tool")
+                            sel_thinking = self.config.get("selected_thinking_level")
+                            
+                            model_to_apply = sel_model
+                            tool_to_apply = sel_sub_tool or sel_tool
+                            thinking_to_apply = sel_thinking
+                            
+                            if discovery_res.get("status") == "success":
+                                discovered = discovery_res.get("data", {})
+                                models = discovered.get("models", [])
+                                main_tools = discovered.get("main_tools", [])
+                                sub_tools = discovered.get("sub_tools", {})
+                                thinking_levels = discovered.get("thinking_levels", [])
+                                
+                                if sel_model and models:
+                                    if sel_model not in models:
+                                        logger.debug(f"Selected model '{sel_model}' not found in live scan. Leaving empty.")
+                                        model_to_apply = None
+                                        
+                                if sel_thinking and thinking_levels:
+                                    if sel_thinking not in thinking_levels:
+                                        logger.debug(f"Selected thinking level '{sel_thinking}' not found in live scan. Leaving empty.")
+                                        thinking_to_apply = None
+                                        
+                                if sel_tool and main_tools:
+                                    if sel_tool in main_tools:
+                                        if sel_tool in sub_tools:
+                                            if sel_sub_tool and sub_tools.get(sel_tool):
+                                                if sel_sub_tool in sub_tools[sel_tool]:
+                                                    tool_to_apply = sel_sub_tool
+                                                else:
+                                                    logger.debug(f"Selected sub-tool '{sel_sub_tool}' not found under '{sel_tool}'. Leaving empty.")
+                                                    tool_to_apply = None
+                                            else:
+                                                tool_to_apply = sel_sub_tool
+                                        else:
+                                            tool_to_apply = sel_tool
+                                    else:
+                                        logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
+                                        tool_to_apply = None
+                            else:
+                                logger.debug(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
+                            
+                            await self._post("/browser/apply_settings", {
+                                "model": model_to_apply,
+                                "tool": tool_to_apply,
+                                "thinking_level": thinking_to_apply
+                            })
+                            
+                            has_files = self.config.get("selected_files")
+                            if has_files:
+                                for f_path in has_files:
+                                    await self._post("/browser/file/add", {"path": f_path})
+                        except Exception as e:
+                            logger.warning(f"Settings setup failed: {e}")
+
                         await self._post("/browser/prompt", {"text": self.config.get("prompt", "")})
                         if self._stop_event.is_set(): break
                         

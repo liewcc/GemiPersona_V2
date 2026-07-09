@@ -158,7 +158,17 @@ async def request_new_chat():
 
 @app.get("/browser/automation/stats")
 async def get_automation_stats():
-    return automation_manager.automation_status
+    stats = dict(automation_manager.automation_status)
+    stats["lc_time_threshold_start_ts"] = getattr(automation_manager, '_lc_time_threshold_start_time', None)
+    
+    # V1 clears only the dict mirror on read; internal _pending_* counters keep
+    # accumulating for loop-control thresholds (V1 engine_service.py:689-692)
+    if "pending_refused" in automation_manager.automation_status:
+        automation_manager.automation_status["pending_refused"] = 0
+    if "pending_resets" in automation_manager.automation_status:
+        automation_manager.automation_status["pending_resets"] = 0
+        
+    return stats
 
 @app.get("/engine/refused_keywords")
 async def get_refused_keywords_ep():
