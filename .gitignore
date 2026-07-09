@@ -17,3 +17,4 @@ test_downloads/
 engine_svc.out
 conductor/conductor.log
 conductor/__pycache__/
+HANDOFF.md
