@@ -15,3 +15,6 @@ browser_session_sandbox/
 # Local test artifacts
 test_downloads/
 engine_svc.out
+conductor/conductor.log
+conductor/__pycache__/
+conductor/data/*.json
