@@ -406,7 +406,10 @@ async def proxy_to_engine(request: Request, path: str):
                 content=body,
                 headers=headers
             )
-            return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type"))
+            ct = resp.headers.get("content-type", "") or ""
+            if ct.startswith("application/json") and "charset" not in ct.lower():
+                ct = "application/json; charset=utf-8"
+            return Response(content=resp.content, status_code=resp.status_code, media_type=ct)
     except Exception as e:
         logger.error(f"Proxy error: {e}")
         return JSONResponse(status_code=502, content={"error": "Bad Gateway"})
