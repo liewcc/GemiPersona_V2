@@ -195,6 +195,130 @@ async def reset_time_timer():
     automation_manager.reset_time_timer()
     return {"status": "success"}
 
+# ── Phase 4 compat-shim endpoints ────────────────────────────────────────────
+# These present the V1 (DT) API surface the Electron UI expects, remapping to the
+# V2 engine or handling locally. MUST be declared BEFORE the catch-all proxy below.
+
+@app.post("/engine/clear_logs")
+async def clear_logs_ep():
+    # V2 auto-rotates via RotatingFileHandler; nothing to clear.
+    return {"status": "success"}
+
+@app.get("/engine/preset")
+async def get_preset_ep(path: str):
+    if not os.path.exists(path):
+        return JSONResponse(status_code=404, content={"detail": "Preset file not found"})
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.post("/engine/preset")
+async def save_preset_ep(path: str, data: dict = Body(...)):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.get("/engine/image_metadata")
+async def image_metadata_ep(path: str):
+    if not os.path.exists(path):
+        return JSONResponse(status_code=404, content={"detail": "Image file not found"})
+    try:
+        from PIL import Image
+        with Image.open(path) as img:
+            return {k: v for k, v in img.info.items() if isinstance(v, str)}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.post("/engine/switch_to_profile")
+async def switch_to_profile_ep(username: str):
+    url = get_engine_url() + "/engine/switch_account"
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(url, json={"username": username})
+        return Response(content=resp.content, status_code=resp.status_code,
+                        media_type=resp.headers.get("content-type"))
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": str(e)})
+
+@app.post("/engine/re_login_current_profile")
+async def re_login_current_profile_ep():
+    url = get_engine_url() + "/engine/re_login"
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(url)
+        return Response(content=resp.content, status_code=resp.status_code,
+                        media_type=resp.headers.get("content-type"))
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": str(e)})
+
+@app.post("/engine/profiles/save")
+async def profiles_save_ep(data: dict = Body(...)):
+    # Vestigial in V2 (profiles derive from Local State); persist the UI's list anyway.
+    profiles = data.get("profiles", [])
+    valid = [r for r in profiles if str(r.get("username", "")).strip()]
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "user_login_lookup.json")
+    try:
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(valid, f, indent=4, ensure_ascii=False)
+        return {"status": "success"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+class ProcessRequest(BaseModel):
+    paths: list = []
+    save_dir: str = ""
+
+@app.post("/browser/process")
+async def process_images_ep(req: ProcessRequest):
+    try:
+        from processing_utils import get_shared_processor, save_with_metadata
+        from PIL import Image
+        # ponytail: GPU flag not wired to V2 config yet; default True. Upgrade: read automation.use_gpu.
+        processor = get_shared_processor(use_gpu=True)
+        p_dir = os.path.join(req.save_dir, "processed")
+        os.makedirs(p_dir, exist_ok=True)
+        processed_count = 0
+        for path in req.paths:
+            if os.path.exists(path):
+                with Image.open(path) as img:
+                    final_img = processor.hybrid_process(img)
+                    p_path = os.path.join(p_dir, os.path.basename(path))
+                    save_with_metadata(final_img, img, p_path)
+                    processed_count += 1
+        return {"status": "success", "processed_count": processed_count, "processed_dir": p_dir}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.post("/browser/attach_files")
+async def attach_files_ep(file_paths: list = Body(...)):
+    # Sync wrapper: converge engine attachments to the desired list via file/add + file/remove.
+    base = get_engine_url()
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            cur_resp = await client.get(base + "/browser/current_attachments")
+            current = cur_resp.json().get("attachments", []) if cur_resp.status_code == 200 else []
+            desired = list(file_paths)
+            # ponytail: compare by basename (engine may report names, not full paths); add-only
+            # fallback would over-attach — acceptable, but we attempt removes too.
+            cur_names = {os.path.basename(str(c)): c for c in current}
+            des_names = {os.path.basename(str(d)): d for d in desired}
+            for name, full in des_names.items():
+                if name not in cur_names:
+                    await client.post(base + "/browser/file/add", json={"path": full})
+            for name, orig in cur_names.items():
+                if name not in des_names:
+                    await client.post(base + "/browser/file/remove", json={"path": orig})
+        return {"status": "success", "count": len(desired)}
+    except Exception as e:
+        return JSONResponse(status_code=502, content={"detail": str(e)})
+
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
 async def proxy_to_engine(request: Request, path: str):

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GemiPersonaPro Loading...</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: var(--font-sans);
+            margin: 0;
+            overflow: hidden;
+        }
+        .logo {
+            width: 300px;
+            margin-bottom: 30px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #58a6ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        .status-text {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            color: #8b949e;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+            0% { opacity: 0.8; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.8; transform: scale(0.98); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader"></div>
+    <div class="status-text" id="statusText">Starting Engine Service...</div>
+
+    <script src="js/api.js"></script>
+    <script>
+        async function checkEngineHealth() {
+            const statusText = document.getElementById('statusText');
+            let attempts = 0;
+            const maxAttempts = 60; // Wait up to 30 seconds
+
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch('http://127.0.0.1:18000/health');
+                    if (response.ok) {
+                        const data = await response.json();
+                        statusText.textContent = "Engine Ready. Loading Setup...";
+                        
+                        // Check if browser is running and redirect
+                        setTimeout(() => {
+                            window.location.href = 'setup.html';
+                        }, 1000);
+                        return;
+                    }
+                } catch (error) {
+                    // API not ready yet, keep trying
+                }
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            statusText.textContent = "Failed to connect to Engine Service. Please restart the app.";
+            statusText.style.color = "#f85149";
+            document.querySelector('.loader').style.display = 'none';
+        }
+
+        // Start checking health when DOM is loaded
+        document.addEventListener('DOMContentLoaded', checkEngineHealth);
+    </script>
+</body>
+</html>

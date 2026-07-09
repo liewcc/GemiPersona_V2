@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GemiPersonaPro - Utilities</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        /* Local UI Styling for Tabs & Layouts */
+        .tab-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: var(--font-display);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid transparent;
+        }
+        .tab-btn:hover {
+            color: var(--text-main);
+            background-color: hsla(0, 0%, 100%, 0.04);
+        }
+        .tab-btn.active {
+            color: var(--text-main);
+            background-color: hsla(263, 80%, 65%, 0.15);
+            border-color: var(--border-focus);
+        }
+        .tab-panel {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .tab-panel.active {
+            display: block;
+        }
+        .settings-grid-sub {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            background: rgba(0,0,0,0.15);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            margin-top: 10px;
+        }
+        .history-table-container {
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.2);
+            margin-top: 12px;
+        }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .history-table th, .history-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .history-table tr:last-child td {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <a href="setup.html" class="nav-item">
+                ⚙️ Setup
+            </a>
+            <a href="utilities.html" class="nav-item active">
+                🛠️ Utilities
+            </a>
+            <a href="account_health.html" class="nav-item">
+                ❤️ Account Health
+            </a>
+            <a href="system_config.html" class="nav-item">
+                ⚙️ System Config
+            </a>
+            <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
+                📂 Open Download Folder
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
+
+            <!-- Top Status Bar -->
+            <div class="grid-2 mb-16">
+                <!-- Browser / Engine Status -->
+                <div class="d-flex align-center justify-between glass" id="upBrowserStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
+                    <div class="d-flex align-center gap-8">
+                        <span id="upEngineStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">ENGINE OFF</span>
+                        <span id="upBrowserStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">BROWSER OFFLINE</span>
+                    </div>
+                    <div><span class="font-weight-600">Log in:</span> <span id="upBrowserAccountText" class="text-muted">Not Ready</span></div>
+                </div>
+                <!-- Automation Stats -->
+                <div class="d-flex align-center glass" id="upAutoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
+                    <div><span id="upAutoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="upStatCycles" class="font-weight-600">0</span> | Images: <span id="upStatImages" class="font-weight-600">0</span> | Refused: <span id="upStatRefused" class="font-weight-600">0</span> | Resets: <span id="upStatResets" class="font-weight-600">0</span></div>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <div class="tab-container" style="margin-bottom: 12px;">
+                <button id="tabBtnUpscaler" class="tab-btn active" onclick="switchTab('upscaler')">🖼️ 4K Upscaler</button>
+                <button id="tabBtnSanitizer" class="tab-btn" onclick="switchTab('sanitizer')">🪄 Asset Sanitizer</button>
+            </div>
+
+            <!-- Tab 1: 4K Upscaler -->
+            <div id="panelUpscaler" class="tab-panel active flex-grow-1" style="height: calc(100vh - 220px); min-height: 0;">
+                <div class="grid-2" style="height: 100%; grid-template-rows: 1fr; min-height: 0;">
+                    
+                    <!-- Left Column: Controls -->
+                    <div class="d-flex flex-column gap-15" style="overflow-y: auto; height: 100%; padding-right: 8px;">
+                        
+                        <!-- Settings Card -->
+                        <div class="card glass mb-0 p-20">
+                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">⚙️ SETTINGS</div>
+                            
+                            <!-- Profile -->
+                            <div class="form-group mb-12">
+                                <label class="form-label">Paid Account Profile</label>
+                                <select class="form-control" id="upProfileSelect" onchange="saveUpscalerConfig()">
+                                    <option value="">Loading profiles...</option>
+                                </select>
+                            </div>
+
+                            <!-- Input Directory -->
+                            <div class="form-group mb-12">
+                                <label class="form-label">Input Directory (Images to Upscale)</label>
+                                <div class="d-flex gap-10">
+                                    <input type="text" class="form-control" id="upInputDir" onblur="saveUpscalerConfig()">
+                                    <button class="btn" onclick="browseInputDir()">Browse</button>
+                                    <button class="btn" onclick="openInputDir()" title="Open Folder">📂</button>
+                                </div>
+                            </div>
+
+                            <!-- Output Directory -->
+                            <div class="form-group mb-12">
+                                <label class="form-label">Output Directory</label>
+                                <div class="d-flex gap-10">
+                                    <input type="text" class="form-control" id="upOutputDir" onblur="saveUpscalerConfig()">
+                                    <button class="btn" onclick="browseOutputDir()">Browse</button>
+                                    <button class="btn" onclick="openOutputDir()" title="Open Folder">📂</button>
+                                </div>
+                            </div>
+
+                            <!-- Upscale Prompt -->
+                            <div class="form-group mb-12">
+                                <label class="form-label">Upscale Prompt</label>
+                                <textarea class="form-control" id="upPrompt" style="height: 80px; resize: vertical;" onblur="saveUpscalerConfig()"></textarea>
+                            </div>
+
+                            <!-- Run Headless Toggle -->
+                            <div class="d-flex align-center justify-between mb-15">
+                                <span class="text-small text-muted" title="Turn off to see the browser window and observe what goes wrong.">Run Headless (Hidden Browser)</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="upHeadlessToggle" checked onchange="saveUpscalerConfig()">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <!-- Delete Activity Controls -->
+                            <div class="form-group mb-15" style="border-top: 1px solid var(--border); padding-top: 12px;">
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small text-muted" title="Automatically delete Gemini activity history at the selected trigger point.">🗑️ Delete Activity</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="upDeleteActivityToggle" onchange="toggleDeleteActivitySubOptions()">
+                                    </label>
+                                </div>
+                                <div id="upDeleteActivitySub" class="settings-grid-sub" style="display: none;">
+                                    <div class="form-group mb-0">
+                                        <label class="form-label">Time Range</label>
+                                        <select class="form-control" id="upDeleteActivityRange" onchange="saveUpscalerConfig()">
+                                            <option value="Last hour">Last hour</option>
+                                            <option value="Last day">Last day</option>
+                                            <option value="All time">All time</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group mb-0">
+                                        <label class="form-label">Trigger</label>
+                                        <select class="form-control" id="upDeleteActivityTrigger" onchange="saveUpscalerConfig()">
+                                            <option value="After Start">After Start</option>
+                                            <option value="After Stop">After Stop</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Max Redo Limit Controls -->
+                            <div class="form-group mb-15" style="border-top: 1px solid var(--border); padding-top: 12px;">
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small text-muted" title="Max number of redos before skipping. Set to 0 to disable.">🔄 Max Redo Limit</span>
+                                    <input type="number" class="form-control" id="upMaxRedoLimit" min="0" max="20" value="3" style="width: 80px;" onblur="saveUpscalerConfig()">
+                                </div>
+                            </div>
+
+                            <!-- Start File Index -->
+                            <div class="form-group mb-15" style="border-top: 1px solid var(--border); padding-top: 12px;">
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small text-muted" title="Starting file number (1-based index).">Start File No.</span>
+                                    <input type="number" class="form-control" id="upStartIndex" min="1" value="1" style="width: 80px;" onblur="saveUpscalerConfig()">
+                                </div>
+                            </div>
+
+                            <!-- Run Operation Button -->
+                            <button id="upStartStopBtn" class="btn btn-primary w-100 mt-20" onclick="toggleUpscalerRun()">🚀 Start Upscaling</button>
+
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Logs & Progress -->
+                    <div class="d-flex flex-column h-100 gap-15" style="min-height: 0;">
+                        
+                        <!-- Status Panel -->
+                        <div class="card glass mb-0 p-20">
+                            <div class="card-header mb-12">
+                                <span>📊 STATUS</span>
+                                <span id="upStateIndicator" class="job-status-badge conn-badge-disconnected">OFFLINE</span>
+                            </div>
+                            <div class="stat-box mb-12">
+                                <div class="stat-label">Currently Processing</div>
+                                <div id="upCurrentFile" class="stat-value text-accent" style="font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 22px;">None</div>
+                            </div>
+
+                            <div class="form-label">Processed Queue</div>
+                            <div class="history-table-container">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>File</th>
+                                            <th>Refusals</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="upHistoryBody">
+                                        <tr>
+                                            <td colspan="3" class="text-muted text-small" style="text-align: center; padding: 20px;">No images processed yet.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Progress Log Panel -->
+                        <div class="card glass mb-0 flex-grow-1 d-flex flex-column p-20" style="min-height: 0;">
+                            <div class="card-header">
+                                <span>📋 PROGRESS LOG</span>
+                                <div class="d-flex gap-8">
+                                    <button class="btn" onclick="clearUpscalerLog()" style="padding: 4px 10px; font-size: 11px;">Clear Log</button>
+                                </div>
+                            </div>
+                            <div id="upLogContainer" class="log-console flex-grow-1" style="min-height: 0; overflow-y: auto;">
+                                <span class="text-muted">Waiting for background worker to start...</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Tab 2: Asset Sanitizer -->
+            <div id="panelSanitizer" class="tab-panel flex-grow-1" style="height: calc(100vh - 220px); min-height: 0;">
+                <div class="grid-2" style="height: 100%; grid-template-rows: 1fr; min-height: 0;">
+
+                    <!-- Left Column: Controls (scrollable) -->
+                    <div class="d-flex flex-column gap-15" style="overflow-y: auto; height: 100%; padding-right: 8px;">
+
+                        <!-- Card 1: File Picker -->
+                        <div class="card glass mb-0 p-20">
+                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">📂 SELECT IMAGE</div>
+                            <div class="d-flex gap-8 align-center">
+                                <input type="text" class="form-control" id="sanImagePath" placeholder="Enter image path or click 📁" list="sanPathHistory" style="flex: 1;">
+                                <datalist id="sanPathHistory"></datalist>
+                                <button class="btn" onclick="sanBrowseFile()" title="Browse">📁</button>
+                                <button class="btn btn-primary" onclick="sanLoadImage()">OK</button>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Metadata (hidden until image loaded) -->
+                        <div class="card glass mb-0 p-20" id="sanMetaCard" style="display: none;">
+                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">🏷️ METADATA</div>
+                            <div id="sanMetaContent"></div>
+                        </div>
+
+                    </div>
+
+                    <!-- Right Column: Preview (no scroll) -->
+                    <div class="d-flex flex-column h-100 gap-15" style="min-height: 0;">
+                        <div class="card glass mb-0 p-20 d-flex flex-column" style="height: 100%; min-height: 0;">
+                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">🖼️ PREVIEW</div>
+                            <div id="sanPreviewWrap" style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden;">
+                                <span class="text-muted" id="sanPreviewPlaceholder">No image selected.</span>
+                                <img id="sanPreviewImg" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--radius-sm);">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+
+
+        </div>
+    </div>
+
+    <!-- Script Integrations -->
+    <script src="js/api.js"></script>
+    <script>
+        let isRunning = false;
+        let isSaving = false;
+        let isConfigLoading = false;
+        let pollTimer = null;
+        let lastLogContent = "";
+
+        // Last path persistence keys
+        function getLastPath(key) {
+            return localStorage.getItem('browsePath_' + key) || undefined;
+        }
+        function setLastPath(key, filePath) {
+            if (filePath) localStorage.setItem('browsePath_' + key, filePath);
+        }
+
+        // Initialize UI values on load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadProfiles();
+            await loadUpscalerConfig();
+            
+            // Start state and log polling loop
+            pollTimer = setInterval(pollUpscalerState, 2000);
+            pollUpscalerState(); // Initial check
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+
+            if (tabName === 'upscaler') {
+                document.getElementById('tabBtnUpscaler').classList.add('active');
+                document.getElementById('panelUpscaler').classList.add('active');
+            } else if (tabName === 'sanitizer') {
+                document.getElementById('tabBtnSanitizer').classList.add('active');
+                document.getElementById('panelSanitizer').classList.add('active');
+            }
+        }
+
+        // Fetch user profiles and populate Paid Account dropdown
+        async function loadProfiles() {
+            const select = document.getElementById('upProfileSelect');
+            try {
+                const response = await api.getProfilesStatus();
+                select.innerHTML = '';
+
+                if (response && response.profiles && response.profiles.length > 0) {
+                    response.profiles.forEach(p => {
+                        const username = typeof p === 'string' ? p : p.username;
+                        if (!username) return;
+                        const opt = document.createElement('option');
+                        opt.value = username;
+                        opt.textContent = username;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    const opt = document.createElement('option');
+                    opt.value = '';
+                    opt.textContent = 'No profiles found';
+                    select.appendChild(opt);
+                }
+            } catch (err) {
+                console.error("Failed to load profiles:", err);
+                select.innerHTML = '<option value="">Failed to load profiles</option>';
+            }
+        }
+
+        // Load configuration settings
+        async function loadUpscalerConfig() {
+            isConfigLoading = true;
+            try {
+                const config = await api.getConfig();
+                const up = (config && config.upscaler) ? config.upscaler : {};
+                
+                // Profile Selection
+                const select = document.getElementById('upProfileSelect');
+                if (up.profile) {
+                    select.value = up.profile;
+                } else if (config && config.active_user) {
+                    select.value = config.active_user;
+                }
+                
+                // Input & Output Paths
+                document.getElementById('upInputDir').value = up.input_dir || config?.save_dir || '';
+                
+                const defaultOutputDir = (up.input_dir || config?.save_dir) ? (up.input_dir || config?.save_dir).replace(/\\/g, '/') + '/Upscale' : '';
+                document.getElementById('upOutputDir').value = up.output_dir || defaultOutputDir;
+                
+                // Prompt Text
+                document.getElementById('upPrompt').value = up.prompt || 'Please upscale this image to 4K quality, keep it exactly as it is and do not change the content.';
+                
+                // Headless Toggle
+                document.getElementById('upHeadlessToggle').checked = up.headless !== false;
+                
+                // Delete Activity Controls
+                const da = up.delete_activity || { enabled: false, range: 'Last hour', trigger: 'After Stop' };
+                document.getElementById('upDeleteActivityToggle').checked = da.enabled === true;
+                document.getElementById('upDeleteActivityRange').value = da.range || 'Last hour';
+                document.getElementById('upDeleteActivityTrigger').value = da.trigger || 'After Stop';
+                toggleDeleteActivitySubOptions();
+                
+                // Max Redo Limit
+                document.getElementById('upMaxRedoLimit').value = up.max_redo !== undefined ? up.max_redo : 3;
+                
+                // Start File Index
+                document.getElementById('upStartIndex').value = up.start_index !== undefined ? up.start_index : 1;
+            } catch (err) {
+                console.error("Failed to load upscaler config:", err);
+            } finally {
+                setTimeout(() => {
+                    isConfigLoading = false;
+                }, 100);
+            }
+        }
+
+        // Save current settings to server
+        async function saveUpscalerConfig() {
+            if (isConfigLoading || isSaving || isRunning) return; // Prevent saving when loading, running or concurrent
+            isSaving = true;
+            try {
+                const daEnabled = document.getElementById('upDeleteActivityToggle').checked;
+
+                const payload = {
+                    upscaler: {
+                        profile: document.getElementById('upProfileSelect').value,
+                        input_dir: document.getElementById('upInputDir').value,
+                        output_dir: document.getElementById('upOutputDir').value,
+                        prompt: document.getElementById('upPrompt').value,
+                        headless: document.getElementById('upHeadlessToggle').checked,
+                        delete_activity: {
+                            enabled: daEnabled,
+                            range: document.getElementById('upDeleteActivityRange').value,
+                            trigger: document.getElementById('upDeleteActivityTrigger').value
+                        },
+                        max_redo: parseInt(document.getElementById('upMaxRedoLimit').value, 10) || 0,
+                        start_index: parseInt(document.getElementById('upStartIndex').value, 10) || 1
+                    }
+                };
+                await api.saveConfig(payload);
+            } catch (err) {
+                console.error("Failed to save config:", err);
+            } finally {
+                isSaving = false;
+            }
+        }
+
+        // Toggle sub-options visibility
+        function toggleDeleteActivitySubOptions() {
+            const enabled = document.getElementById('upDeleteActivityToggle').checked;
+            document.getElementById('upDeleteActivitySub').style.display = enabled ? 'grid' : 'none';
+            saveUpscalerConfig();
+        }
+
+        // Pick directory handles
+        async function browseInputDir() {
+            try {
+                const paths = await window.electronAPI.selectDirectory({
+                    properties: ['openDirectory'],
+                    defaultPath: getLastPath('upInput')
+                });
+                if (paths && paths.length > 0) {
+                    const dir = paths[0];
+                    document.getElementById('upInputDir').value = dir;
+                    setLastPath('upInput', dir);
+                    
+                    // Auto-fill Output directory to [InputDir]/Upscale
+                    const outputField = document.getElementById('upOutputDir');
+                    if (!outputField.value || outputField.value.endsWith('/Upscale') || outputField.value.endsWith('\\Upscale')) {
+                        const autoOutput = dir.replace(/\\/g, '/') + '/Upscale';
+                        outputField.value = autoOutput;
+                        setLastPath('upOutput', autoOutput);
+                    }
+                    await saveUpscalerConfig();
+                }
+            } catch (err) {
+                console.error("Error picking input dir:", err);
+            }
+        }
+
+        async function browseOutputDir() {
+            try {
+                const paths = await window.electronAPI.selectDirectory({
+                    properties: ['openDirectory'],
+                    defaultPath: getLastPath('upOutput')
+                });
+                if (paths && paths.length > 0) {
+                    const dir = paths[0];
+                    document.getElementById('upOutputDir').value = dir;
+                    setLastPath('upOutput', dir);
+                    await saveUpscalerConfig();
+                }
+            } catch (err) {
+                console.error("Error picking output dir:", err);
+            }
+        }
+
+        async function openInputDir() {
+            const dir = document.getElementById('upInputDir').value;
+            if (dir) await window.electronAPI.openFile(dir);
+        }
+
+        async function openOutputDir() {
+            const dir = document.getElementById('upOutputDir').value;
+            if (dir) await window.electronAPI.openFile(dir);
+        }
+
+        // Start/Stop executing process
+        async function toggleUpscalerRun() {
+            const runBtn = document.getElementById('upStartStopBtn');
+
+            if (!isRunning) {
+                // ── 1. Validate profile ──────────────────────────────────────────
+                const profile = document.getElementById('upProfileSelect').value;
+                if (!profile) {
+                    alert('⚠️ Please select a Paid Account Profile first.');
+                    return;
+                }
+
+                // ── 2. Validate directories ──────────────────────────────────────
+                const inputDir  = document.getElementById('upInputDir').value;
+                const outputDir = document.getElementById('upOutputDir').value;
+                if (!inputDir || !outputDir) {
+                    alert('⚠️ Input and Output directories must be specified.');
+                    return;
+                }
+
+                // ── 3. Block if automation is running ────────────────────────────
+                try {
+                    const autoStats = await api.getAutomationStats();
+                    if (autoStats && autoStats.is_running) {
+                        alert('⚠️ Automation is currently running.\nPlease stop the automation on the Setup page before starting the 4K Upscaler.');
+                        return;
+                    }
+                } catch { /* engine not up yet — fine, we will start it */ }
+
+                // ── 4. Ensure main browser is stopped (releases Cookies file lock) ──
+                runBtn.disabled = true;
+                runBtn.textContent = '⏳ Preparing...';
+                appendLog('🔄 Checking system state...');
+
+                try {
+                    let engineRunning = false;
+                    try {
+                        const bStatus = await api.getBrowserStatus();
+                        engineRunning = !!(bStatus && bStatus.engine_running);
+                    } catch {}
+
+                    if (engineRunning) {
+                        appendLog('🔄 Stopping main browser to release profile lock...');
+                        runBtn.textContent = '⏳ Stopping browser...';
+                        try {
+                            await api.stopEngine();
+                            appendLog('✅ Main browser stopped.');
+                            // Brief pause to ensure file handles are released
+                            await new Promise(r => setTimeout(r, 1000));
+                        } catch (stopErr) {
+                            appendLog(`⚠️ Could not stop browser cleanly: ${stopErr.message}`);
+                        }
+                    } else {
+                        appendLog('ℹ️ Main browser is offline — ready to start upscaler.');
+                    }
+
+                    // ── 5. Launch the upscaler worker ────────────────────────────────
+                    runBtn.textContent = '⏳ Launching...';
+                    appendLog('🚀 Starting upscaler background worker...');
+
+                    const daEnabled = document.getElementById('upDeleteActivityToggle').checked;
+                    const payload = {
+                        profile,
+                        input_dir:  inputDir,
+                        output_dir: outputDir,
+                        prompt: document.getElementById('upPrompt').value,
+                        headless: document.getElementById('upHeadlessToggle').checked,
+                        delete_activity_enabled: daEnabled,
+                        delete_activity_range:   document.getElementById('upDeleteActivityRange').value,
+                        delete_activity_trigger: document.getElementById('upDeleteActivityTrigger').value,
+                        max_redo:    parseInt(document.getElementById('upMaxRedoLimit').value, 10) || 0,
+                        start_index: parseInt(document.getElementById('upStartIndex').value, 10) || 1
+                    };
+
+                    const response = await api.startUpscaler(payload);
+                    if (response.status === 'success') {
+                        isRunning = true;
+                        updateRunningUI(true);
+                    } else {
+                        throw new Error(response.message || 'Failed to start upscaler.');
+                    }
+                } catch (err) {
+                    appendLog(`❌ Error: ${err.message}`);
+                    alert('Failed to start upscaler: ' + err.message);
+                } finally {
+                    runBtn.disabled = false;
+                    if (!isRunning) {
+                        runBtn.className = 'btn btn-primary w-100 mt-20';
+                        runBtn.textContent = '🚀 Start Upscaling';
+                    }
+                }
+
+            } else {
+                // ── Stop ─────────────────────────────────────────────────────────
+                runBtn.disabled = true;
+                runBtn.textContent = 'Stopping...';
+                try {
+                    await api.stopUpscaler();
+                    isRunning = false;
+                    updateRunningUI(false);
+                } catch (err) {
+                    alert('Error stopping upscaler: ' + err.message);
+                } finally {
+                    runBtn.disabled = false;
+                }
+            }
+        }
+
+        // Control UI inputs availability based on status
+        function updateRunningUI(running) {
+            const elements = [
+                'upProfileSelect', 'upInputDir', 'upOutputDir', 'upPrompt',
+                'upHeadlessToggle', 'upDeleteActivityToggle', 'upDeleteActivityRange',
+                'upDeleteActivityTrigger', 'upMaxRedoLimit', 'upStartIndex'
+            ];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = running;
+            });
+
+            // Browse and open buttons
+            document.querySelectorAll('#panelUpscaler .btn').forEach(btn => {
+                if (btn.id !== 'upStartStopBtn' && btn.onclick && (btn.onclick.toString().includes('browse') || btn.onclick.toString().includes('clear'))) {
+                    btn.disabled = running;
+                }
+            });
+
+            const btn = document.getElementById('upStartStopBtn');
+            if (running) {
+                btn.className = "btn btn-danger w-100 mt-20";
+                btn.textContent = "🛑 Stop Upscaling";
+                document.getElementById('upStateIndicator').className = "job-status-badge conn-badge-connected";
+                document.getElementById('upStateIndicator').textContent = "RUNNING";
+            } else {
+                btn.className = "btn btn-primary w-100 mt-20";
+                btn.textContent = "🚀 Start Upscaling";
+                document.getElementById('upStateIndicator').className = "job-status-badge conn-badge-disconnected";
+                document.getElementById('upStateIndicator').textContent = "OFFLINE";
+            }
+        }
+
+        // Prepend a styled log line at the top of the log container (newest-first)
+        function appendLog(line) {
+            const logContainer = document.getElementById('upLogContainer');
+            if (!logContainer) return;
+            const lineClass = (line.includes('❌') || line.includes('Error')) ? 'error'
+                            : (line.includes('⚠️') || line.includes('Warning'))  ? 'warn'
+                            : (line.includes('✅') || line.includes('Saved'))    ? 'success' : 'info';
+            const now = new Date();
+            const ts = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
+            const br = document.createElement('br');
+            const span = document.createElement('span');
+            span.className = lineClass;
+            span.textContent = `${ts} ${line}`;
+            logContainer.insertBefore(br, logContainer.firstChild);
+            logContainer.insertBefore(span, logContainer.firstChild);
+            logContainer.scrollTop = 0;
+        }
+
+        // Poll Logs and status
+        async function pollUpscalerState() {
+            try {
+                // 0. Refresh top status bar
+                try {
+                    let isServiceRunning = false;
+                    let isBrowserRunning = false;
+                    let isUpscalerRunning = false;
+                    try {
+                        const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                        isServiceRunning = svcStatus.running;
+                    } catch (err) {
+                        console.error("Failed to get engine service status:", err);
+                    }
+
+                    if (isServiceRunning) {
+                        try {
+                            const bStatus = await api.getBrowserStatus();
+                            isBrowserRunning = !!(bStatus && bStatus.engine_running);
+                        } catch (err) {
+                            isServiceRunning = false;
+                        }
+
+                        try {
+                            const upscalerStatus = await api.getUpscalerStatus();
+                            isUpscalerRunning = !!(upscalerStatus && upscalerStatus.running);
+                        } catch (err) {
+                            console.error("Failed to get upscaler status:", err);
+                        }
+                    }
+
+                    const isBrowserOnline = isBrowserRunning || isUpscalerRunning;
+
+                    const engineEl  = document.getElementById('upEngineStatusText');
+                    const browserEl = document.getElementById('upBrowserStatusText');
+                    const accountEl = document.getElementById('upBrowserAccountText');
+
+                    if (isServiceRunning) {
+                        engineEl.className  = 'job-status-badge conn-badge-connected';
+                        engineEl.textContent = 'ENGINE ON';
+                    } else {
+                        engineEl.className   = 'job-status-badge conn-badge-disconnected';
+                        engineEl.textContent  = 'ENGINE OFF';
+                    }
+
+                    if (isBrowserOnline) {
+                        browserEl.className  = 'job-status-badge conn-badge-connected';
+                        browserEl.textContent = 'BROWSER ONLINE';
+                        try {
+                            if (isUpscalerRunning) {
+                                const config = await api.getConfig();
+                                accountEl.textContent = config?.upscaler?.profile || 'Unknown';
+                            } else {
+                                const acc = await api.getAccountInfo();
+                                accountEl.textContent = acc.account_id || 'Unknown';
+                            }
+                        } catch { accountEl.textContent = 'Not logged in'; }
+                    } else {
+                        browserEl.className  = 'job-status-badge conn-badge-disconnected';
+                        browserEl.textContent = 'BROWSER OFFLINE';
+                        accountEl.textContent = 'Not Ready';
+                    }
+                } catch (err) {
+                    console.error("Error polling top status in utilities:", err);
+                }
+
+                try {
+                    const autoStats = await api.getAutomationStats();
+                    const badge = document.getElementById('upAutoStatusBadge');
+                    if (autoStats) {
+                        if (autoStats.is_running) {
+                            badge.className  = 'job-status-badge conn-badge-connected';
+                            badge.textContent = 'RUNNING';
+                        } else if (autoStats.cycles > 0) {
+                            badge.className  = 'job-status-badge conn-badge-disconnected';
+                            badge.textContent = 'IDLE / FINISHED';
+                        } else {
+                            badge.className  = 'job-status-badge conn-badge-disconnected';
+                            badge.textContent = 'STANDBY';
+                        }
+                    } else {
+                        badge.className  = 'job-status-badge conn-badge-disconnected';
+                        badge.textContent = 'OFFLINE';
+                    }
+                    document.getElementById('upStatCycles').textContent  = autoStats?.cycles    ?? 0;
+                    document.getElementById('upStatImages').textContent  = autoStats?.successes ?? 0;
+                    document.getElementById('upStatRefused').textContent = autoStats?.refusals  ?? 0;
+                    document.getElementById('upStatResets').textContent  = autoStats?.resets    ?? 0;
+                } catch {
+                    const badge = document.getElementById('upAutoStatusBadge');
+                    if (badge) {
+                        badge.className  = 'job-status-badge conn-badge-disconnected';
+                        badge.textContent = 'OFFLINE';
+                    }
+                }
+
+                // 1. Fetch Upscaler Status
+                const status = await api.getUpscalerStatus();
+                const wasRunning = isRunning;
+                isRunning = status.running;
+                
+                if (wasRunning !== isRunning) {
+                    updateRunningUI(isRunning);
+                }
+
+                // Render current processing file
+                const currentEl = document.getElementById('upCurrentFile');
+                if (status.status && status.status.current_file) {
+                    currentEl.textContent = status.status.current_file;
+                    currentEl.title = status.status.current_file;
+                } else {
+                    currentEl.textContent = isRunning ? "Initializing browser..." : "None";
+                }
+
+                // Render history processed table
+                const tbody = document.getElementById('upHistoryBody');
+                if (status.status && status.status.history && Object.keys(status.status.history).length > 0) {
+                    let html = '';
+                    const historyKeys = Object.keys(status.status.history).reverse(); // Latest first
+                    historyKeys.forEach(fname => {
+                        const item = status.status.history[fname];
+                        let icon = '✅';
+                        let badgeClass = 'text-success';
+                        
+                        if (item.status === 'processing') {
+                            icon = '🔄';
+                            badgeClass = 'text-accent';
+                        } else if (item.status === 'skipped') {
+                            icon = '💨';
+                            badgeClass = 'text-muted';
+                        } else if (item.status === 'error') {
+                            icon = '❌';
+                            badgeClass = 'text-danger';
+                        }
+
+                        html += `<tr>
+                            <td class="font-weight-600" style="word-break: break-all;" title="${fname}">${fname}</td>
+                            <td>${item.refusals || 0}</td>
+                            <td class="${badgeClass} font-weight-600">${icon} ${item.status.toUpperCase()}</td>
+                        </tr>`;
+                    });
+                    tbody.innerHTML = html;
+                } else {
+                    tbody.innerHTML = `<tr>
+                        <td colspan="3" class="text-muted text-small" style="text-align: center; padding: 20px;">No images processed yet.</td>
+                    </tr>`;
+                }
+
+                // 2. Fetch Logs
+                const logData = await api.getUpscalerLogs();
+                const logContainer = document.getElementById('upLogContainer');
+                if (logData && logData.logs && logData.logs !== lastLogContent) {
+                    lastLogContent = logData.logs;
+                    
+                    // Style log keywords — newest line at top
+                    const lines = lastLogContent.split('\n').reverse();
+                    let styledHTML = '';
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        let lineClass = 'info';
+                        if (line.includes('❌') || line.includes('Error')) {
+                            lineClass = 'error';
+                        } else if (line.includes('⚠️') || line.includes('Warning')) {
+                            lineClass = 'warn';
+                        } else if (line.includes('✅') || line.includes('Saved')) {
+                            lineClass = 'success';
+                        }
+                        styledHTML += `<span class="${lineClass}">${escapeHtml(line)}</span><br>`;
+                    });
+                    
+                    logContainer.innerHTML = styledHTML || '<span class="text-muted">Waiting for background worker to start...</span>';
+                    
+                    // Newest entry is always at top — keep scrolled to top
+                    logContainer.scrollTop = 0;
+                }
+            } catch (err) {
+                console.error("Error polling state:", err);
+            }
+        }
+
+        // Clean Logs handle
+        async function clearUpscalerLog() {
+            try {
+                await api.clearUpscalerLogs();
+                lastLogContent = "";
+                document.getElementById('upLogContainer').innerHTML = '<span class="text-muted">Console logs cleared.</span>';
+            } catch (err) {
+                alert("Failed to clear log: " + err.message);
+            }
+        }
+
+        // Helper: escape HTML tags
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Electron open folders helper
+        async function triggerOpenDownloadFolder(event) {
+            if (event) event.preventDefault();
+            try {
+                const config = await api.getConfig();
+                const saveDir = config.save_dir;
+                if (saveDir) {
+                    const result = await window.electronAPI.openFile(saveDir);
+                    if (result) {
+                        alert("Error opening download folder: " + result);
+                    }
+                } else {
+                    alert("Download folder has not been configured in setup yet.");
+                }
+            } catch (err) {
+                alert("Failed to fetch configuration: " + err.message);
+            }
+        }
+
+        // ── Asset Sanitizer ───────────────────────────────────────────────────────────
+        const SAN_HISTORY_KEY = 'sanPathHistory';
+        const SAN_MAX_HISTORY = 10;
+
+        function sanLoadHistory() {
+            const list = JSON.parse(localStorage.getItem(SAN_HISTORY_KEY) || '[]');
+            const datalist = document.getElementById('sanPathHistory');
+            datalist.innerHTML = list.map(p => `<option value="${p}">`).join('');
+        }
+
+        function sanSavePath(p) {
+            let list = JSON.parse(localStorage.getItem(SAN_HISTORY_KEY) || '[]');
+            list = [p, ...list.filter(x => x !== p)].slice(0, SAN_MAX_HISTORY);
+            localStorage.setItem(SAN_HISTORY_KEY, JSON.stringify(list));
+            sanLoadHistory();
+        }
+
+        async function sanBrowseFile() {
+            const paths = await window.electronAPI.selectFile({
+                title: 'Select Image',
+                filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+                properties: ['openFile']
+            });
+            if (paths && paths.length > 0) {
+                document.getElementById('sanImagePath').value = paths[0];
+                sanLoadImage();
+            }
+        }
+
+        async function sanLoadImage() {
+            const p = document.getElementById('sanImagePath').value.trim();
+            if (!p) return;
+            sanSavePath(p);
+            localStorage.setItem('sanLastPath', p);
+
+            // Preview
+            const b64 = await window.electronAPI.readImageBase64(p);
+            if (b64) {
+                const ext = p.split('.').pop().toLowerCase();
+                const mime = ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/webp';
+                document.getElementById('sanPreviewImg').src = b64.startsWith('data:') ? b64 : `data:${mime};base64,${b64}`;
+                document.getElementById('sanPreviewImg').style.display = 'block';
+                document.getElementById('sanPreviewPlaceholder').style.display = 'none';
+            }
+
+            // Metadata (PNG only)
+            const ext = p.split('.').pop().toLowerCase();
+            const metaCard = document.getElementById('sanMetaCard');
+            const metaContent = document.getElementById('sanMetaContent');
+            if (ext === 'png') {
+                try {
+                    const meta = await window.electronAPI.readPngMetadata(p);
+                    if (meta && Object.keys(meta).length > 0) {
+                        metaContent.innerHTML = Object.entries(meta).map(([k, v]) => `
+                            <div style="margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">${k}</div>
+                                <div style="font-size: 13px; word-break: break-all; white-space: pre-wrap;">${v}</div>
+                            </div>`).join('');
+                    } else {
+                        metaContent.innerHTML = '<span class="text-muted text-small">No text metadata found in this PNG.</span>';
+                    }
+                } catch (e) {
+                    metaContent.innerHTML = `<span class="text-muted text-small">Error reading metadata: ${e.message}</span>`;
+                }
+                metaCard.style.display = 'block';
+            } else {
+                metaCard.style.display = 'none';
+            }
+        }
+
+        // Init history on load, restore last image
+        sanLoadHistory();
+        const sanLastPath = localStorage.getItem('sanLastPath');
+        if (sanLastPath) {
+            document.getElementById('sanImagePath').value = sanLastPath;
+            sanLoadImage();
+        }
+    </script>
+</body>
+</html>

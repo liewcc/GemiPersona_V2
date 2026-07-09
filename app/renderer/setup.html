@@ -1,0 +1,2835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GemiPersonaPro - Setup</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        /* Modal Overlay for Aspect Ratio Looping Table */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 650px;
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            background-color: var(--bg-secondary);
+            box-shadow: var(--shadow);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .btn-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .btn-close:hover {
+            color: var(--text-main);
+        }
+        .table-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+        }
+        .ar-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .ar-matrix-table th, .ar-matrix-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        .ar-matrix-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .ar-matrix-table tr:last-child td {
+            border-bottom: none;
+        }
+        .ar-matrix-table input[type="number"], .ar-matrix-table select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 13px;
+            width: 100%;
+        }
+        .ar-matrix-table input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-preview-card {
+            min-width: 0;
+        }
+        .file-preview-card img {
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .file-preview-card img:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <a href="setup.html" class="nav-item active">
+                ⚙️ Setup
+            </a>
+            <a href="utilities.html" class="nav-item">
+                🛠️ Utilities
+            </a>
+            <a href="account_health.html" class="nav-item">
+                ❤️ Account Health
+            </a>
+            <a href="system_config.html" class="nav-item">
+                ⚙️ System Config
+            </a>
+            <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
+                📂 Open Download Folder
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
+            <!-- Top Status Bar -->
+            <div class="d-flex flex-column mb-24 gap-15" style="width: 100%;">
+                <!-- Row 1: Browser Status + Automation Stats (mirrors account_health grid-2 pattern) -->
+                <div class="grid-2" style="flex-shrink: 0;">
+                    <div class="d-flex align-center justify-between glass" id="browserStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
+                        <div class="d-flex align-center gap-8">
+                            <span id="engineStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">ENGINE OFF</span>
+                            <span id="browserStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">BROWSER OFFLINE</span>
+                        </div>
+                        <div><span class="font-weight-600">Log in:</span> <span id="browserAccountText" class="text-muted">Not Ready</span></div>
+                    </div>
+                    <!-- Automation Stats -->
+                    <div class="d-flex align-center justify-between glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; white-space: nowrap; overflow: hidden;">
+                        <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span><span id="newImagesBadge" class="new-images-badge" style="display: none;" title="Click to clear" onclick="resetNewImagesBadge()">+0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
+                        <span id="updateStatusBadge" style="display:none; margin-left:16px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(255,204,0,0.15); border:1px solid rgba(255,204,0,0.4); color:#ffcc00; white-space:nowrap; flex-shrink:0;"></span>
+                    </div>
+                </div>
+                <!-- Row 2: Action Controls -->
+                <div class="d-flex gap-15 flex-wrap" style="width: 100%;">
+                    <!-- Single Action Controls -->
+                    <div class="d-flex align-center justify-center gap-10 glass" id="singleActionControlBarTop" style="padding: 0 10px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; flex: 1 1 200px;">
+                        <button id="btnSubmitTop" class="btn btn-primary flex-grow-1" onclick="triggerCombineSubmit()" style="height: 28px; font-size: 11px; padding: 0 6px; line-height: 1; white-space: nowrap;">🚀 Submit</button>
+                        <button id="btnRedoTop" class="btn flex-grow-1" onclick="triggerRedo()" style="height: 28px; font-size: 11px; padding: 0 6px; line-height: 1; white-space: nowrap;">🔄 Redo</button>
+                        <button id="btnStopTop" class="btn btn-danger flex-grow-1" onclick="triggerStopResponse()" style="height: 28px; font-size: 11px; padding: 0 6px; line-height: 1; white-space: nowrap;">🛑 Stop</button>
+                    </div>
+                    <!-- Automation Controls -->
+                    <div class="d-flex align-center justify-center gap-10 glass" id="autoControlBar" style="padding: 0 10px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; flex: 1.1 1 220px;">
+                        <button id="btnStartStop" class="btn btn-primary flex-grow-1" onclick="toggleStartStopAutomation()" style="height: 28px; font-size: 11px; padding: 0 6px; line-height: 1; white-space: nowrap;">▶ Start Loop</button>
+                        <button id="btnContinue" class="btn flex-grow-1" onclick="openContinueModal()" style="height: 28px; font-size: 11px; padding: 0 6px; line-height: 1; white-space: nowrap;">▶ Continue Loop</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid-2 flex-grow-1" style="grid-template-rows: 1fr; min-height: 0; flex: 1;">
+                <!-- Left Column: Controls -->
+                <div class="d-flex flex-column gap-15" style="overflow-y: auto; height: 100%; padding-right: 8px; min-height: 0; min-width: 0;">
+                    <!-- ENGINE OPERATIONS -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">ENGINE OPERATIONS</div>
+                        <div class="grid-2" style="gap: 15px;">
+                            <button id="engineCardBtn" class="btn w-100" onclick="toggleEngine()">Start Engine</button>
+                            <button id="browserCardBtn" class="btn w-100" onclick="toggleBrowser()">Start Browser</button>
+                        </div>
+                        <div class="d-flex align-center justify-between mt-12" style="padding-top: 12px;">
+                            <span class="text-small text-muted">Headless Mode <span style="font-size: 10px; opacity: 0.6;">(off = show browser window)</span></span>
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="headlessToggle" checked onchange="saveConfigField('headless', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="d-flex align-center justify-between mt-12" style="padding-top: 12px; border-top: 1px solid var(--border);">
+                            <span class="text-small text-muted">Auto Start Browser <span style="font-size: 10px; opacity: 0.6;">(on = launch browser when engine starts)</span></span>
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="autoStartBrowserToggle" checked onchange="saveConfigField('auto_start_browser', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="d-flex align-center justify-between mt-12" style="padding-top: 12px; border-top: 1px solid var(--border);">
+                            <span class="text-small text-muted">Auto Continue Loop <span style="font-size: 10px; opacity: 0.6;">(on = resume loop after browser starts)</span></span>
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="autoContinueLoopToggle" onchange="saveConfigField('auto_continue_loop', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <div class="d-flex align-center justify-between mt-12" style="padding-top: 12px; border-top: 1px solid var(--border);">
+                            <span class="text-small text-muted">Pre-warm Tab <span style="font-size: 10px; opacity: 0.6;">(tab pre-warmed on start)</span></span>
+                            <select id="prewarmTabSelect" class="form-control" style="padding: 2px 24px 2px 8px; font-size: 11px; height: 28px; width: 110px;" onchange="changePrewarmTab(this.value)">
+                                <option value="gemini">Gemini</option>
+                                <option value="deepseek">Deepseek</option>
+                                <option value="copilot">Copilot</option>
+                                <option value="chatgpt">ChatGPT</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ACCOUNT ACTIONS -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">ACCOUNT ACTIONS</div>
+                        
+                        <div class="d-flex gap-10 mb-10">
+                            <button class="btn flex-grow-1" onclick="updateAccountStatus()">🔍 Check Log In Status</button>
+                            <button class="btn flex-grow-1" onclick="startRegistration()" title="Open registration browser">📋 Add New Profile</button>
+                        </div>
+                        <div class="d-flex gap-10 mb-10">
+                            <button class="btn flex-grow-1" onclick="switchProfilePrev()">⏮️ Log In Previous Profile</button>
+                            <button class="btn flex-grow-1" id="btnReLogin" onclick="reLoginCurrentProfile()">🔄 Re-login Current Profile</button>
+                            <button class="btn flex-grow-1" onclick="switchProfileNext()">⏭️ Log In Next Profile</button>
+                        </div>
+                        <div class="d-flex gap-10 align-center mb-10">
+                            <select class="form-control flex-grow-1" id="targetProfileSelect" style="min-width: 0;">
+                                <option value="">Select Target Profile...</option>
+                            </select>
+                            <button class="btn" onclick="switchToTargetProfile()">👤 Switch</button>
+                        </div>
+                        <div class="d-flex align-center gap-8 mt-5">
+                            <span class="text-small text-muted">Active Profile:</span>
+                            <span id="setupAccountLabel" class="text-small text-accent font-weight-600">Checking...</span>
+                        </div>
+                    </div>
+
+                    <!-- IMAGE REFERENCE -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">IMAGE REFERENCE</div>
+                        <div class="d-flex gap-10 mb-15">
+                            <input type="text" id="metaFilePath" class="form-control flex-grow-1" placeholder="Metadata File Path...">
+                            <button class="btn" onclick="browseMetadataFile()">📁 Browse</button>
+                            <button class="btn btn-success" onclick="applyMetadata()">✅ Apply</button>
+                        </div>
+                        <div class="d-flex gap-20">
+                            <label class="d-flex align-center gap-8 text-small"><input type="radio" name="imgMode" value="extract" checked> Extract metadata from image</label>
+                            <label class="d-flex align-center gap-8 text-small"><input type="radio" name="imgMode" value="modify"> Modify image</label>
+                        </div>
+                    </div>
+
+                    <!-- PRESET TEMPLATE -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">PRESET TEMPLATE</div>
+                        <div class="d-flex gap-10 mb-15">
+                            <input type="text" id="presetFilePath" class="form-control flex-grow-1" placeholder="Preset File Path...">
+                            <button class="btn" onclick="browsePresetFile()">📁 Browse</button>
+                        </div>
+                        <div class="d-flex gap-10">
+                            <button class="btn flex-grow-1" onclick="createNewPreset()">🆕 New</button>
+                            <button class="btn flex-grow-1" onclick="savePreset()">💾 Save</button>
+                            <button class="btn flex-grow-1" onclick="savePresetAs()">💾 Save As</button>
+                            <button class="btn btn-success flex-grow-1" onclick="applyPreset()">✅ Apply</button>
+                        </div>
+                    </div>
+
+                    <!-- BROWSER URL -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">BROWSER URL</div>
+                        <input type="text" id="urlInput" class="form-control mb-15" value="https://gemini.google.com/app">
+                        <div class="d-flex gap-10">
+                            <button class="btn flex-grow-1" onclick="loadUrlFromConfig()">📂 Load</button>
+                            <button class="btn flex-grow-1" onclick="saveUrlToConfig()">💾 Save</button>
+                            <button class="btn btn-primary flex-grow-1" id="btnUrlSend" onclick="navigate()">🚀 Send</button>
+                        </div>
+                    </div>
+
+                    <!-- ASPECT RATIO SETTING -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">ASPECT RATIO SETTING</div>
+                        <div class="grid-3 align-center">
+                            <div class="d-flex flex-column gap-10">
+                                <label class="d-flex align-center gap-8 text-small"><input type="radio" name="arMode" id="arModeFixed" value="fixed" checked onchange="toggleArMode(false)"> Fixed Aspect Ratio</label>
+                                <label class="d-flex align-center gap-8 text-small"><input type="radio" name="arMode" id="arModeDynamic" value="dynamic" onchange="toggleArMode(true)"> Dynamic Prefix Loop</label>
+                            </div>
+                            <div>
+                                <select class="form-control w-100" id="arFixedSelect" onchange="saveFixedAspectRatio(this.value)">
+                                    <option value="16:9 (Landscape)">16:9 (Landscape)</option>
+                                    <option value="9:16 (Portrait)">9:16 (Portrait)</option>
+                                    <option value="1:1 (Square)">1:1 (Square)</option>
+                                    <option value="4:3 (Landscape)">4:3 (Landscape)</option>
+                                    <option value="3:4 (Portrait)">3:4 (Portrait)</option>
+                                    <option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option>
+                                    <option value="3:2 (Landscape)">3:2 (Landscape)</option>
+                                    <option value="2:3 (Portrait)">2:3 (Portrait)</option>
+                                    <option value="None">None</option>
+                                </select>
+                            </div>
+                            <button class="btn w-100 h-100" onclick="openArModal()">📊 AR Table</button>
+                        </div>
+                    </div>
+
+                    <!-- PROMPT -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">PROMPT</div>
+                        <div class="d-flex gap-15">
+                            <textarea id="promptTarget" class="form-control flex-grow-1" style="height: 380px; resize: vertical;" placeholder="Enter prompt here..."></textarea>
+                            <div class="d-flex flex-column gap-10" style="width: 220px;">
+                                <button class="btn text-small" onclick="loadPromptFromConfig()">📂 Load Prompt</button>
+                                <button class="btn text-small" onclick="savePromptToConfig()">💾 Save Prompt</button>
+                                <button class="btn btn-primary w-100 mt-10" id="btnPromptSend" onclick="sendPromptToBrowser()">🚀 Send</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TOOL & MODEL SELECTION -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">TOOL & MODEL SELECTION</div>
+                        <div class="d-flex flex-column gap-15">
+                            <!-- Tool & Sub Menu Row -->
+                            <div class="d-flex gap-15">
+                                <div class="form-group mb-0 flex-grow-1">
+                                    <label class="form-label" style="font-size: 0.75em; color: #8b949e; margin-bottom: 5px; display: block;">Tool</label>
+                                    <select class="form-control" id="toolSelect" onchange="updateSubToolOptions()">
+                                        <option value="">Default Tool</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mb-0 flex-grow-1">
+                                    <label class="form-label" style="font-size: 0.75em; color: #8b949e; margin-bottom: 5px; display: block;">Sub Menu</label>
+                                    <select class="form-control" id="subToolSelect">
+                                        <option value="">Default Sub Menu</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Model & Thinking Level Row -->
+                            <div class="d-flex gap-15">
+                                <div class="form-group mb-0 flex-grow-1">
+                                    <label class="form-label" style="font-size: 0.75em; color: #8b949e; margin-bottom: 5px; display: block;">Model</label>
+                                    <select class="form-control" id="modelSelect">
+                                        <option value="">Default Model</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mb-0 flex-grow-1">
+                                    <label class="form-label" style="font-size: 0.75em; color: #8b949e; margin-bottom: 5px; display: block;">Thinking Level</label>
+                                    <select class="form-control" id="thinkingLevelSelect">
+                                        <option value="">Default Thinking Level</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Action Buttons Row -->
+                            <div class="d-flex gap-10 justify-end" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 5px;">
+                                <button class="btn text-small" onclick="discoverCapabilities()" title="Discover model/tool profiles">🔄 Discover</button>
+                                <button class="btn text-small" onclick="saveToolModelSettings()">💾 Save</button>
+                                <button class="btn btn-primary text-small" id="btnApplySettings" onclick="applyToolModelSettings()">🚀 Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- UPLOAD FILES TO BROWSER -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">UPLOAD FILES TO BROWSER</div>
+                        <button class="btn w-100 mb-15" onclick="addUploadFiles()">➕ Add Files</button>
+                        <div id="uploadFilesPreview" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 250px; overflow-y: auto; overflow-x: hidden; padding: 4px 2px; width: 100%;">
+                            <span class="text-muted text-small" style="grid-column: 1 / -1; text-align: center; padding: 20px; width: 100%;">No files selected</span>
+                        </div>
+                        <div class="d-flex gap-10 mt-15">
+                                <button class="btn flex-grow-1" onclick="clearUploadFiles()">🗑️ Delete All</button>
+                                <button class="btn btn-primary flex-grow-1" id="btnUploadSend" onclick="sendUploadFiles()">🚀 Send</button>
+                            </div>
+                    </div>
+
+                    <!-- STORAGE & FILE NAMING -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">STORAGE & FILE NAMING</div>
+                        
+                        <div class="form-group mb-15">
+                            <label class="form-label">Download Folder</label>
+                            <div class="d-flex gap-10">
+                                <input type="text" class="form-control" id="saveDirInput" onblur="saveNamingFields()">
+                                <button class="btn" onclick="browseSaveDir()">📁 Browse</button>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-10">
+                            <div class="form-group mb-0 flex-grow-1">
+                                <label class="form-label">Output Name Prefix</label>
+                                <input type="text" class="form-control" id="filePrefixInput" onblur="saveNamingFields()">
+                            </div>
+                            <div class="form-group mb-0 flex-grow-1">
+                                <label class="form-label">Padding</label>
+                                <input type="number" class="form-control" id="namePaddingInput" min="1" max="10" onblur="saveNamingFields()">
+                            </div>
+                            <div class="form-group mb-0 flex-grow-1">
+                                <label class="form-label">Start No.</label>
+                                <input type="number" class="form-control" id="nameStartInput" min="0" onblur="saveNamingFields()">
+                            </div>
+                        </div>
+                        <div class="d-flex align-center gap-8 mt-15" style="padding-top: 12px; border-top: 1px solid var(--border);">
+                            <label class="switch" style="flex-shrink: 0;">
+                                <input type="checkbox" id="trackLastFileNumToggle" onchange="saveNamingFields()">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="text-small text-muted" title="Use the maximum existing file number in the download folder to determine the next filename.">Auto-track Last Number</span>
+                        </div>
+                    </div>
+
+                    <!-- WATERMARK REMOVAL -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">WATERMARK REMOVAL</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                            <div class="d-flex align-center justify-between">
+                                <label class="text-small mb-0" style="white-space: nowrap;">Remove Watermark</label>
+                                <label class="switch"><input type="checkbox" id="removeWmToggle" checked onchange="saveWatermarkSettings()"><span class="slider"></span></label>
+                            </div>
+                            <div class="d-flex align-center justify-between">
+                                <label class="text-small mb-0" style="white-space: nowrap;">Use GPU (CUDA)</label>
+                                <label class="switch"><input type="checkbox" id="useGpuToggle" checked onchange="saveWatermarkSettings()"><span class="slider"></span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AUTOMATION CONTROL -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">AUTOMATION CONTROL</div>
+                        
+                        <div class="d-flex align-center justify-between mb-20" style="background: rgba(0,0,0,0.15); padding: 10px 15px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                            <div class="d-flex align-center gap-10">
+                                <label class="text-small mb-0 text-accent font-weight-600">Auto Looping</label>
+                                <label class="switch"><input type="checkbox" id="autoLoopingToggle" checked onchange="saveAutomationSettings()"><span class="slider"></span></label>
+                            </div>
+                            <div class="d-flex align-center gap-10">
+                                <label class="text-small mb-0 text-accent font-weight-600">Goal</label>
+                                <input type="number" id="autoGoalInput" class="form-control" value="1" min="1" style="width: 70px; height: 28px; padding: 4px 8px; text-align: center; font-size: 12px;" onchange="saveAutomationSettings()">
+                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer;"><input type="radio" name="stopCondition" value="rounds" checked onchange="saveAutomationSettings()"> Cycles</label>
+                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer;"><input type="radio" name="stopCondition" value="images" onchange="saveAutomationSettings()"> Images</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Loop Control Panel -->
+                        <div class="mt-20">
+                            <div class="d-flex justify-between align-center mb-15">
+                                <span class="text-small font-weight-600 text-accent" style="text-transform: uppercase; letter-spacing: 0.5px;">⚙️ Loop Control (Account Switching)</span>
+                            </div>
+                            
+                            <div class="d-flex flex-column gap-15">
+                                <!-- Infinite Loop with Cooldown -->
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small font-weight-600" style="cursor: help;" title="Restart from 1st account on finish">♾️ Infinite Loop</span>
+                                    <div class="d-flex align-center gap-10">
+                                        <input type="number" id="lc_inf_min" class="form-control" style="width: 60px; padding: 4px 8px; text-align: center; font-size: 12px; height: 28px;" min="1" max="1440" placeholder="Min" />
+                                        <label class="switch">
+                                            <input type="checkbox" id="lc_inf_en">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Time Threshold -->
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small font-weight-600" style="cursor: help;" title="Switch or re-login after set minutes">⏱️ Time Threshold</span>
+                                    <div class="d-flex align-center gap-10">
+                                        <!-- Timer display row (only visible when time threshold enabled & running) -->
+                                        <div id="lcTimerDisplay" class="d-flex align-center gap-6 text-small text-muted" style="display: none; padding-left: 2px;">
+                                            <span style="font-size: 10px;">⏳ Elapsed:</span>
+                                            <span id="lcTimerElapsed" class="text-accent font-weight-600">0:00</span>
+                                            <span class="text-muted">/</span>
+                                            <span id="lcTimerLimit">0:00</span>
+                                            <button class="btn" id="btnResetTimer" onclick="resetLcTimeTimer()" style="padding: 2px 6px; font-size: 10px; height: 20px; min-height: 20px; line-height: 1; margin-left: 4px;" title="Reset Time Threshold Timer">🔄</button>
+                                        </div>
+                                        <select id="lc_time_action" class="form-control" style="padding: 2px 24px 2px 8px; font-size: 11px; height: 28px; width: 110px;">
+                                            <option value="next_profile">Next Profile</option>
+                                            <option value="re_login">Re-login</option>
+                                        </select>
+                                        <input type="number" id="lc_time_min" class="form-control" style="width: 60px; padding: 4px 8px; text-align: center; font-size: 12px; height: 28px;" min="1" max="600" placeholder="Min" />
+                                        <label class="switch">
+                                            <input type="checkbox" id="lc_time_en">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Refused Threshold -->
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small font-weight-600" style="cursor: help;" title="Switch account after consecutive refusals">🚫 Refused Threshold</span>
+                                    <div class="d-flex align-center gap-10">
+                                        <select id="lc_ref_action" class="form-control" style="padding: 2px 24px 2px 8px; font-size: 11px; height: 28px; width: 110px;">
+                                            <option value="next_profile">Next Profile</option>
+                                            <option value="re_login">Re-login</option>
+                                        </select>
+                                        <input type="number" id="lc_ref_thr" class="form-control" style="width: 60px; padding: 4px 8px; text-align: center; font-size: 12px; height: 28px;" min="1" max="999" placeholder="Count" />
+                                        <label class="switch">
+                                            <input type="checkbox" id="lc_ref_en">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Reset Threshold -->
+                                <div class="d-flex align-center justify-between">
+                                    <span class="text-small font-weight-600" style="cursor: help;" title="Switch account after consecutive resets">🔄 Reset Threshold</span>
+                                    <div class="d-flex align-center gap-10">
+                                        <select id="lc_rst_action" class="form-control" style="padding: 2px 24px 2px 8px; font-size: 11px; height: 28px; width: 110px;">
+                                            <option value="next_profile">Next Profile</option>
+                                            <option value="re_login">Re-login</option>
+                                        </select>
+                                        <input type="number" id="lc_rst_thr" class="form-control" style="width: 60px; padding: 4px 8px; text-align: center; font-size: 12px; height: 28px;" min="1" max="999" placeholder="Count" />
+                                        <label class="switch">
+                                            <input type="checkbox" id="lc_rst_en">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                    <!-- ACTION CONTROL (COMBINED) -->
+                    <div class="card glass mb-0 p-20">
+                        <!-- Section 1: Single Action Control -->
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <span>SINGLE ACTION CONTROL</span>
+                            <div id="actionsLoadingSpinner" class="hidden"></div>
+                        </div>
+                        <!-- Row 1 -->
+                        <div class="d-flex gap-10 mb-10">
+                            <button class="btn flex-grow-1" id="btnNewChat" onclick="triggerNewChat()">➕ New Chat</button>
+                            <button class="btn btn-primary flex-grow-1" id="btnSubmitPrompt" onclick="sendPromptToBrowser()">🚀 Submit Prompt</button>
+                            <button class="btn btn-primary flex-grow-1" id="btnUploadFile" onclick="sendUploadFiles()">🚀 Upload File</button>
+                        </div>
+                        <!-- Row 2 -->
+                        <div class="d-flex gap-10">
+                            <button class="btn btn-primary flex-grow-1" id="btnSubmit" onclick="triggerSubmit()">🚀 Submit</button>
+                            <button class="btn flex-grow-1" id="btnRedo" onclick="triggerRedo()">🔄 Redo</button>
+                            <button class="btn btn-danger flex-grow-1" id="btnStop" onclick="triggerStopResponse()">🛑 Stop</button>
+                        </div>
+
+                        <!-- Divider -->
+                        <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+                        <!-- Section 2: Combine Action Control -->
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <span>COMBINE ACTION CONTROL</span>
+                            <div id="combineActionsLoadingSpinner" class="hidden"></div>
+                        </div>
+                        <div class="d-flex gap-10">
+                            <button class="btn btn-primary" id="btnCombineSubmit" onclick="triggerCombineSubmit()" style="flex: 2; font-size: 12px; font-weight: 600;">⚡ New Chat + Submit Prompt + Upload File + Submit</button>
+                            <button class="btn" id="btnCombineRedo" onclick="triggerRedo()" style="flex: 1;">🔄 Redo</button>
+                            <button class="btn btn-danger" id="btnCombineStop" onclick="triggerStopResponse()" style="flex: 1;">🛑 Stop</button>
+                        </div>
+
+                        <!-- Divider -->
+                        <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+                        <button class="btn w-100" onclick="triggerCaptureDom()">📄 Capture Browser DOM to File</button>
+                    </div>
+
+                    <!-- UPDATE & RELAUNCH -->
+                    <div class="card glass mb-0 p-20">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">MAINTENANCE</div>
+                        <button id="btnUpdateRelaunch" class="btn w-100" onclick="triggerUpdateAndRelaunch(event)" disabled style="opacity: 0.35; cursor: not-allowed;">⬆ Update & Relaunch</button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Live Logs -->
+                <div class="d-flex flex-column h-100" style="min-height: 0; height: 100%; min-width: 0;">
+                    <div class="card glass mb-0 flex-grow-1 d-flex flex-column" style="height: 100%; min-height: 0;">
+                        <div class="card-header justify-between d-flex">
+                            <span>Engine Live Logs</span>
+                            <div class="d-flex gap-10">
+                                <button class="btn" onclick="clearSetupLogs()" style="padding: 6px 12px; font-size: 12px;">Clear Console</button>
+                                <button class="btn btn-danger" onclick="api.clearEngineLogs().then(() => clearSetupLogs())" style="padding: 6px 12px; font-size: 12px;">Clear Engine Log</button>
+                            </div>
+                        </div>
+                        <div id="setupLogContainer" class="log-console flex-grow-1" style="flex: 1; min-height: 0; overflow-y: auto;">
+                            <span class="info">Ready for setup tasks.</span><br>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aspect Ratio Looping Table Modal -->
+    <div id="arModal" class="modal-overlay hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3>Aspect Ratio Looping Table</h3>
+                <button class="btn-close" onclick="closeArModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted text-small mb-10">Configure aspect ratio targets and repeats for dynamic looping. The loop will process the checked active ratio.</p>
+                <div class="table-container">
+                    <table class="ar-matrix-table">
+                        <thead>
+                            <tr>
+                                <th>Aspect Ratio</th>
+                                <th>Repeat</th>
+                                <th>Count</th>
+                                <th>Active</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="arTableBody">
+                            <!-- Matrix rows loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-15 d-flex gap-10">
+                    <button class="btn flex-grow-1" onclick="addRowArTable()">➕ Add Row</button>
+                    <button class="btn flex-grow-1" onclick="resetArCounts()">🔄 Reset Counts</button>
+                    <button class="btn btn-success flex-grow-1" onclick="saveArTable()">💾 Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Continue Session Modal -->
+    <div id="continueModal" class="modal-overlay hidden">
+        <div class="modal-content glass" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>Continue Session</h3>
+                <button class="btn-close" onclick="closeContinueModal()">×</button>
+            </div>
+            <div class="modal-body" style="padding-bottom: 20px; line-height: 1.5; color: var(--text-muted); font-size: 13px;">
+                <p style="margin-bottom: 15px; color: var(--text-main); font-weight: 500;">Select how you want to continue the session:</p>
+                
+                <div class="d-flex flex-column gap-15 mb-20" style="background: rgba(0,0,0,0.15); padding: 15px; border-radius: 6px; border: 1px solid var(--border);">
+                    <label class="d-flex align-start gap-10" style="cursor: pointer;">
+                        <input type="radio" id="continue_opt_reset" name="continueOption" value="reset" checked style="margin-top: 3px; cursor: pointer;" onchange="saveContinueSessionPreference()">
+                        <div class="d-flex flex-column">
+                            <span class="font-weight-600" style="color: var(--text-main);">Reset Timer & Clear Pending</span>
+                            <span class="text-small text-muted">Clear pending counters (refusals/resets) and start a fresh cycle time threshold timer (recommended).</span>
+                        </div>
+                    </label>
+                    
+                    <label class="d-flex align-start gap-10" style="cursor: pointer;">
+                        <input type="radio" id="continue_opt_keep" name="continueOption" value="keep" style="margin-top: 3px; cursor: pointer;" onchange="saveContinueSessionPreference()">
+                        <div class="d-flex flex-column">
+                            <span class="font-weight-600" style="color: var(--text-main);">Keep Timer & Pending Stats</span>
+                            <span class="text-small text-muted">Use last saved session data and continue the original time threshold timer.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-end gap-10">
+                <button class="btn btn-primary" onclick="confirmContinueAutomation()">Confirm</button>
+                <button class="btn btn-danger" onclick="closeContinueModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="imagePreviewModal" class="modal-overlay hidden" onclick="closeImageModal()">
+        <div class="modal-content glass" style="max-width: 800px; display: flex; flex-direction: column; align-items: center; gap: 15px;" onclick="event.stopPropagation()">
+            <div class="modal-header" style="width: 100%; margin-bottom: 10px;">
+                <h3 id="imagePreviewTitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 600px;">Image Preview</h3>
+                <button class="btn-close" onclick="closeImageModal()">×</button>
+            </div>
+            <div style="width: 100%; display: flex; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px; border: 1px solid var(--border);">
+                <img id="imagePreviewImg" src="" style="max-width: 100%; max-height: 50vh; object-fit: contain; border-radius: 4px;">
+            </div>
+            <div class="d-flex w-100 justify-between align-center" style="gap: 15px;">
+                <div id="imagePreviewFilePath" class="text-small text-muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 450px;" title="Full Path"></div>
+                <div class="d-flex gap-10 justify-end">
+                    <button id="btnShowInExplorer" class="btn" onclick="showInExplorer()">📂 Show in Explorer</button>
+                    <button id="btnOpenSystemViewer" class="btn btn-primary" onclick="openInSystemViewer()">🖥️ Open in System Viewer</button>
+                    <button class="btn" onclick="closeImageModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let localConfig = {};
+        let selectedFilesList = [];
+        let localPromptMatrixItems = [];
+        let isGeneratingBusy = false;
+        let isConfigLoading = false;
+        let autoStartedBrowser = sessionStorage.getItem('autoStartedBrowser') === 'true';
+        let autoContinuedLoop = sessionStorage.getItem('autoContinuedLoop') === 'true';
+        let prevBrowserOnline = null;
+
+        let baseSuccesses = null;
+
+        function resetNewImagesBadge() {
+            const statImages = document.getElementById('statImages');
+            const currentSuccesses = statImages ? parseInt(statImages.textContent, 10) || 0 : 0;
+            baseSuccesses = currentSuccesses;
+            localStorage.setItem('setup_cleared_successes', baseSuccesses);
+            const badge = document.getElementById('newImagesBadge');
+            if (badge) {
+                badge.style.display = 'none';
+                badge.textContent = '+0';
+            }
+        }
+
+        // ── Last-path helpers (persisted via localStorage) ─────────────────────
+        function getLastPath(key) {
+            return localStorage.getItem('browsePath_' + key) || undefined;
+        }
+        function setLastPath(key, filePath) {
+            if (filePath) localStorage.setItem('browsePath_' + key, filePath);
+        }
+        // Given a full file path, return its parent directory
+        function getDirFromPath(filePath) {
+            if (!filePath) return undefined;
+            // Handle both forward and back slashes
+            const idx = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+            return idx > 0 ? filePath.substring(0, idx) : undefined;
+        }
+        // ───────────────────────────────────────────────────────────────────────
+
+        // Load configuration and initialize UI
+        async function loadConfigFromServer() {
+            isConfigLoading = true;
+            try {
+                const config = await api.getConfig();
+                localConfig = config;
+                
+                // Account setup labels
+                updateAccountStatus();
+                updateAutomationStats();
+
+                // URL Setting
+                if (config.browser_url) {
+                    document.getElementById('urlInput').value = config.browser_url;
+                    updateExtractedTitleLabel(config.browser_url);
+                }
+
+                // Preset file
+                if (config.preset_file_path) {
+                    document.getElementById('presetFilePath').value = config.preset_file_path;
+                }
+
+                // Sync aspect ratio dropdown
+                const arSelect = document.getElementById('arFixedSelect');
+                if (arSelect && config.fixed_aspect_ratio) {
+                    arSelect.value = config.fixed_aspect_ratio;
+                }
+
+                // Sync aspect ratio mode radios
+                const arModeFixed = document.getElementById('arModeFixed');
+                const arModeDynamic = document.getElementById('arModeDynamic');
+                if (config.prompt_matrix && config.prompt_matrix.enabled) {
+                    arModeDynamic.checked = true;
+                } else {
+                    arModeFixed.checked = true;
+                }
+
+                // Sync prompt textarea
+                if (config.prompt !== undefined) {
+                    document.getElementById('promptTarget').value = config.prompt;
+                }
+
+                // Discovery dropdown options
+                populateDiscoverySelects(config);
+
+                // Previews of files to upload
+                if (config.selected_files) {
+                    selectedFilesList = config.selected_files;
+                    renderUploadFilesPreviews();
+                }
+
+                // Storage naming fields
+                if (config.save_dir) {
+                    document.getElementById('saveDirInput').value = config.save_dir;
+                }
+                document.getElementById('filePrefixInput').value = config.name_prefix || '';
+                document.getElementById('namePaddingInput').value = config.name_padding || 2;
+                document.getElementById('nameStartInput').value = (config.name_start !== undefined && config.name_start !== null) ? config.name_start : 1;
+                document.getElementById('trackLastFileNumToggle').checked = config.track_last_file_num === true;
+
+                // Engine operation toggles
+                document.getElementById('headlessToggle').checked = config.headless !== false;
+                document.getElementById('autoStartBrowserToggle').checked = config.auto_start_browser !== false;
+                document.getElementById('autoContinueLoopToggle').checked = config.auto_continue_loop === true;
+                document.getElementById('prewarmTabSelect').value = config.prewarm_tab || 'gemini';
+
+                // Sync toggles and looping values
+                if (config.automation) {
+                    document.getElementById('removeWmToggle').checked = config.automation.remove_watermark !== false;
+                    document.getElementById('useGpuToggle').checked = config.automation.use_gpu !== false;
+                    
+                    document.getElementById('autoLoopingToggle').checked = config.automation.auto_looping === true;
+                    const autoModeVal = config.automation.mode || 'rounds';
+                    const autoModeRadio = document.querySelector(`input[name="stopCondition"][value="${autoModeVal}"]`);
+                    if (autoModeRadio) autoModeRadio.checked = true;
+                    document.getElementById('autoGoalInput').value = config.automation.goal || 1;
+                    
+                    const continueClearPending = config.automation.continue_clear_pending !== false;
+                    if (continueClearPending) {
+                        document.getElementById('continue_opt_reset').checked = true;
+                    } else {
+                        document.getElementById('continue_opt_keep').checked = true;
+                    }
+
+                    // Sync Loop Control fields
+                    if (config.automation.loop_control) {
+                        const lc = config.automation.loop_control;
+                        document.getElementById('lc_inf_en').checked = lc.infinite_loop_enabled === true;
+                        document.getElementById('lc_inf_min').value = lc.infinite_loop_minutes !== undefined ? lc.infinite_loop_minutes : 60;
+                        
+                        document.getElementById('lc_time_en').checked = lc.time_enabled === true;
+                        document.getElementById('lc_time_min').value = lc.time_minutes !== undefined ? lc.time_minutes : 10;
+                        document.getElementById('lc_time_action').value = lc.time_action || 'next_profile';
+                        
+                        document.getElementById('lc_ref_en').checked = lc.refused_enabled === true;
+                        document.getElementById('lc_ref_thr').value = lc.refused_threshold !== undefined ? lc.refused_threshold : 5;
+                        document.getElementById('lc_ref_action').value = lc.refused_action || 'next_profile';
+                        
+                        document.getElementById('lc_rst_en').checked = lc.reset_enabled === true;
+                        document.getElementById('lc_rst_thr').value = lc.reset_threshold !== undefined ? lc.reset_threshold : 3;
+                        document.getElementById('lc_rst_action').value = lc.reset_action || 'next_profile';
+                    } else {
+                        document.getElementById('lc_inf_en').checked = false;
+                        document.getElementById('lc_inf_min').value = 60;
+                        
+                        document.getElementById('lc_time_en').checked = false;
+                        document.getElementById('lc_time_min').value = 10;
+                        document.getElementById('lc_time_action').value = 'next_profile';
+                        
+                        document.getElementById('lc_ref_en').checked = false;
+                        document.getElementById('lc_ref_thr').value = 5;
+                        document.getElementById('lc_ref_action').value = 'next_profile';
+                        
+                        document.getElementById('lc_rst_en').checked = false;
+                        document.getElementById('lc_rst_thr').value = 3;
+                        document.getElementById('lc_rst_action').value = 'next_profile';
+                    }
+                    updateLcInputsState();
+                }
+
+                populateProfilesSelect();
+            } catch (err) {
+                console.error('Failed to load configuration:', err);
+            } finally {
+                setTimeout(() => { isConfigLoading = false; }, 150);
+            }
+        }
+
+        // Configuration Save Helpers
+        async function saveConfigField(key, value) {
+            try {
+                const updates = {};
+                updates[key] = value;
+                const newConfig = await api.saveConfig(updates);
+                localConfig = newConfig;
+                appendLog(`Saved config: ${key} = ${JSON.stringify(value)}`, 'success');
+            } catch (err) {
+                console.error(err);
+                appendLog('Failed to save config update', 'error');
+            }
+        }
+
+        async function changePrewarmTab(val) {
+            try {
+                const urls = {
+                    gemini: 'https://gemini.google.com/app',
+                    deepseek: 'https://chat.deepseek.com',
+                    copilot: 'https://copilot.microsoft.com',
+                    chatgpt: 'https://chatgpt.com'
+                };
+                const targetUrl = urls[val] || 'https://gemini.google.com/app';
+                
+                const newConfig = await api.saveConfig({
+                    prewarm_tab: val,
+                    browser_url: targetUrl
+                });
+                localConfig = newConfig;
+                
+                const urlInput = document.getElementById('urlInput');
+                if (urlInput) {
+                    urlInput.value = targetUrl;
+                }
+                updateExtractedTitleLabel(targetUrl);
+                
+                appendLog(`Pre-warm tab changed to: ${val}. Browser URL updated to: ${targetUrl}`, 'success');
+            } catch (err) {
+                console.error(err);
+                appendLog('Failed to change pre-warm tab', 'error');
+            }
+        }
+
+        async function saveConfigAutomationField(key, value) {
+            try {
+                const auto = localConfig.automation || {};
+                auto[key] = value;
+                const newConfig = await api.saveConfig({ automation: auto });
+                localConfig = newConfig;
+                appendLog(`Saved automation config: ${key} = ${JSON.stringify(value)}`, 'success');
+            } catch (err) {
+                console.error(err);
+                appendLog('Failed to save automation config', 'error');
+            }
+        }
+
+        // 1. ACCOUNT ACTIONS
+        async function startRegistration() {
+            try {
+                appendLog('Requesting registration mode...', 'info');
+                await api.startRegistrationMode();
+                appendLog('Registration mode active. Browser should open.', 'success');
+            } catch (err) {
+                appendLog('Failed to start registration: ' + err.message, 'error');
+            }
+        }
+
+        async function toggleEngine() {
+            const btn = document.getElementById('engineCardBtn');
+            if (!btn) return;
+            const action = btn.textContent.trim();
+            try {
+                if (action === 'Start Engine') {
+                    appendLog(`Starting engine service...`, 'info');
+                    autoStartedBrowser = false;
+                    sessionStorage.setItem('autoStartedBrowser', 'false');
+                    autoContinuedLoop = false;
+                    sessionStorage.setItem('autoContinuedLoop', 'false');
+                    prevBrowserOnline = null;
+                    await window.electronAPI.startEngineService();
+                    appendLog('Engine service started.', 'success');
+                } else {
+                    appendLog('Stopping engine and browser...', 'warn');
+                    // Stop browser first gracefully if running
+                    try {
+                        const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                        if (svcStatus.running) {
+                            try {
+                                appendLog('Closing browser gracefully...', 'info');
+                                await api.stopEngine();
+                            } catch(e) {
+                                console.log("Failed to stop browser gracefully:", e);
+                            }
+                            await new Promise(r => setTimeout(r, 1000));
+                        }
+                    } catch (e) {
+                        console.error("Error stopping browser gracefully before engine stop:", e);
+                    }
+                    await window.electronAPI.stopEngineService();
+                    appendLog('Engine and browser stopped.', 'success');
+                }
+                updateAccountStatus();
+            } catch (err) {
+                appendLog('Engine operation failed: ' + err.message, 'error');
+            }
+        }
+
+        async function toggleBrowser() {
+            const btn = document.getElementById('browserCardBtn');
+            if (!btn) return;
+            const action = btn.textContent.trim();
+            const headless = document.getElementById('headlessToggle')?.checked ?? true;
+            try {
+                if (action === 'Start Browser') {
+                    // Guard: check if upscaler is running
+                    try {
+                        const upscalerStatus = await api.getUpscalerStatus();
+                        if (upscalerStatus && upscalerStatus.running) {
+                            alert('⚠️ 4K Upscaler is currently running.\nPlease stop the upscaler on the Utilities page before starting the browser.');
+                            return;
+                        }
+                    } catch (e) {}
+
+                    // Guard: close any lingering registration browser before starting the main one
+                    try {
+                        await api.stopRegistrationMode();
+                    } catch (e) {}
+                    appendLog(`Starting browser (headless=${headless})...`, 'info');
+                    await api.startEngine({ headless });
+                    appendLog('Browser started.', 'success');
+                } else {
+                    // Set flag BEFORE the async stop so any concurrent poll
+                    // that fires during the await cannot see autoStartedBrowser=false
+                    // and trigger an unwanted autostart.
+                    autoStartedBrowser = true;
+                    sessionStorage.setItem('autoStartedBrowser', 'true');
+                    appendLog('Stopping browser...', 'warn');
+                    await api.stopEngine();
+                    appendLog('Browser stopped.', 'success');
+                }
+                updateAccountStatus();
+            } catch (err) {
+                appendLog('Browser operation failed: ' + err.message, 'error');
+            }
+        }
+
+        async function updateAccountStatus() {
+            const setupAccountLabel = document.getElementById('setupAccountLabel');
+            const engineStatusText = document.getElementById('engineStatusText');
+            const browserStatusText = document.getElementById('browserStatusText');
+            const browserAccountText = document.getElementById('browserAccountText');
+            const engineCardBtn = document.getElementById('engineCardBtn');
+            const browserCardBtn = document.getElementById('browserCardBtn');
+
+            let isServiceRunning = false;
+            let isBrowserRunning = false;
+            let isUpscalerRunning = false;
+            let browserStatus = null;
+
+            try {
+                // Check if engine process is running from Electron's perspective
+                const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                isServiceRunning = svcStatus.running;
+            } catch (err) {
+                console.error("Failed to get engine service status:", err);
+            }
+
+            if (isServiceRunning) {
+                try {
+                    browserStatus = await api.getBrowserStatus();
+                    isBrowserRunning = !!(browserStatus && browserStatus.engine_running); // engine_running here means Playwright browser
+                    if (isBrowserRunning) {
+                        autoStartedBrowser = true; // Browser is already online, no need to autostart
+                        sessionStorage.setItem('autoStartedBrowser', 'true');
+                    }
+                } catch (err) {
+                    // API request failed, maybe service is starting or frozen
+                    isServiceRunning = false;
+                }
+                
+                try {
+                    const upscalerStatus = await api.getUpscalerStatus();
+                    isUpscalerRunning = !!(upscalerStatus && upscalerStatus.running);
+                } catch (err) {
+                    console.error("Failed to get upscaler status:", err);
+                }
+            }
+
+            const isBrowserOnline = isBrowserRunning || isUpscalerRunning;
+
+            // Autostart browser on program launch once engine is ready (only if upscaler isn't running)
+            const autoStartEnabled = localConfig ? localConfig.auto_start_browser !== false : true;
+            if (isServiceRunning && !isBrowserOnline && !autoStartedBrowser && autoStartEnabled) {
+                autoStartedBrowser = true;
+                sessionStorage.setItem('autoStartedBrowser', 'true');
+                console.log("[AUTOSTART] Engine is running, browser is offline. Triggering autostart browser...");
+                appendLog("Engine online. Autostarting browser...", "info");
+                loadConfigFromServer().then(() => {
+                    setTimeout(() => {
+                        toggleBrowser();
+                    }, 500);
+                }).catch(configErr => {
+                    console.error("[AUTOSTART] Failed to load config before autostart:", configErr);
+                    setTimeout(() => {
+                        toggleBrowser();
+                    }, 500);
+                });
+            }
+
+            // Update Engine Button and Label
+            if (isServiceRunning) {
+                if (engineCardBtn) engineCardBtn.textContent = 'Stop Engine';
+                if (engineStatusText) {
+                    engineStatusText.className = 'job-status-badge conn-badge-connected';
+                    engineStatusText.textContent = 'ENGINE ON';
+                }
+            } else {
+                if (engineCardBtn) engineCardBtn.textContent = 'Start Engine';
+                if (engineStatusText) {
+                    engineStatusText.className = 'job-status-badge conn-badge-disconnected';
+                    engineStatusText.textContent = 'ENGINE OFF';
+                }
+            }
+
+            // Update Browser Button and Label
+            if (isBrowserRunning) {
+                if (browserCardBtn) {
+                    browserCardBtn.textContent = 'Stop Browser';
+                    browserCardBtn.removeAttribute('disabled');
+                    browserCardBtn.title = '';
+                }
+            } else {
+                if (browserCardBtn) {
+                    browserCardBtn.textContent = 'Start Browser';
+                    if (isServiceRunning) {
+                        if (isUpscalerRunning) {
+                            browserCardBtn.setAttribute('disabled', 'true');
+                            browserCardBtn.title = '4K Upscaler is running';
+                        } else {
+                            browserCardBtn.removeAttribute('disabled');
+                            browserCardBtn.title = '';
+                        }
+                    } else {
+                        browserCardBtn.setAttribute('disabled', 'true');
+                        browserCardBtn.title = 'Start Engine first';
+                    }
+                }
+            }
+
+            // Auto Continue Loop: trigger when browser transitions from offline to online
+            if (isBrowserOnline && prevBrowserOnline === false) {
+                const autoContinueEnabled = document.getElementById('autoContinueLoopToggle')?.checked;
+                if (autoContinueEnabled && !autoContinuedLoop) {
+                    autoContinuedLoop = true;
+                    sessionStorage.setItem('autoContinuedLoop', 'true');
+                    appendLog('Browser online. Auto-continuing loop...', 'info');
+                    const clearPending = localConfig?.automation?.continue_clear_pending !== false;
+                    setTimeout(() => executeContinueAutomation(clearPending), 800);
+                }
+            }
+            if (!isBrowserOnline) {
+                autoContinuedLoop = false;
+                sessionStorage.setItem('autoContinuedLoop', 'false');
+            }
+            prevBrowserOnline = isBrowserOnline;
+
+            if (isBrowserOnline) {
+                if (browserStatusText) {
+                    browserStatusText.className = 'job-status-badge conn-badge-connected';
+                    browserStatusText.textContent = 'BROWSER ONLINE';
+                }
+            } else {
+                if (browserStatusText) {
+                    browserStatusText.className = 'job-status-badge conn-badge-disconnected';
+                    browserStatusText.textContent = 'BROWSER OFFLINE';
+                }
+            }
+
+            // Update Active Profile and Logged In Text
+            try {
+                const config = await api.getConfig();
+                const activeProfile = config.active_user || 'None';
+                const cleanedProfile = activeProfile.replace(/@gmail\.com$/i, '');
+                if (setupAccountLabel) setupAccountLabel.textContent = cleanedProfile;
+            } catch (err) {
+                console.error("Failed to load active profile from config:", err);
+                if (setupAccountLabel) setupAccountLabel.textContent = 'Unknown';
+            }
+
+            if (isServiceRunning && isBrowserOnline) {
+                try {
+                    if (isUpscalerRunning) {
+                        const config = await api.getConfig();
+                        const upAcc = config?.upscaler?.profile || 'Unknown';
+                        const cleanedUpAcc = upAcc.replace(/@gmail\.com$/i, '');
+                        if (browserAccountText) browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedUpAcc}</span>`;
+                    } else {
+                        const acc = await api.getAccountInfo();
+                        const rawAccId = acc.account_id || acc.status || 'Active';
+                        const cleanedAccId = rawAccId.replace(/@gmail\.com$/i, '');
+                        if (browserAccountText) browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedAccId}</span>`;
+                    }
+                } catch(e) {
+                    if (browserAccountText) browserAccountText.innerHTML = `<span class="text-muted">Scanning...</span>`;
+                }
+            } else {
+                if (browserAccountText) browserAccountText.innerHTML = `<span class="text-muted">Not Ready</span>`;
+            }
+        }
+
+        async function populateProfilesSelect() {
+            try {
+                const res = await api.getProfiles();
+                const select = document.getElementById('targetProfileSelect');
+                if (res.profiles) {
+                    const currentVal = select.value;
+                    select.innerHTML = '<option value="">Select Target Profile...</option>';
+                    res.profiles.forEach(p => {
+                        select.innerHTML += `<option value="${p}" ${p === currentVal ? 'selected' : ''}>${p}</option>`;
+                    });
+                }
+            } catch(e) {
+                console.error('Failed to load profiles');
+            }
+        }
+
+        async function switchToTargetProfile() {
+            const username = document.getElementById('targetProfileSelect').value;
+            if (!username) return;
+            try {
+                appendLog(`Switching to profile: ${username}...`, 'info');
+                const res = await api.switchToProfile(username);
+                appendLog(`Profile switch status: ${res.message}`, 'success');
+                setTimeout(updateAccountStatus, 1500);
+            } catch (err) {
+                appendLog('Switch failed: ' + err.message, 'error');
+            }
+        }
+
+        async function switchProfileNext() {
+            try {
+                appendLog('Switching to next profile...', 'info');
+                const res = await api.switchProfile();
+                appendLog(`Profile switch status: ${res.message}`, 'success');
+                setTimeout(updateAccountStatus, 1500);
+            } catch (err) {
+                appendLog('Switch failed: ' + err.message, 'error');
+            }
+        }
+
+        async function switchProfilePrev() {
+            try {
+                appendLog('Switching to previous profile...', 'info');
+                const res = await api.switchProfilePrevious();
+                appendLog(`Profile switch status: ${res.message}`, 'success');
+                setTimeout(updateAccountStatus, 1500);
+            } catch (err) {
+                appendLog('Switch failed: ' + err.message, 'error');
+            }
+        }
+
+        async function reLoginCurrentProfile() {
+            try {
+                appendLog('Re-logging current profile...', 'info');
+                const btn = document.getElementById('btnReLogin');
+                if (btn) btn.disabled = true;
+                
+                const res = await api.reLoginCurrentProfile();
+                appendLog(`Re-login status: ${res.message}`, 'success');
+                setTimeout(updateAccountStatus, 1500);
+            } catch (err) {
+                appendLog('Re-login failed: ' + err.message, 'error');
+            } finally {
+                const btn = document.getElementById('btnReLogin');
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // 2. IMAGE REFERENCE
+        async function browseMetadataFile() {
+            try {
+                const lastDir = getLastPath('metaFile');
+                const filePaths = await window.electronAPI.selectFile({
+                    title: 'Select Metadata Image File',
+                    defaultPath: lastDir,
+                    filters: [
+                        { name: 'PNG Images', extensions: ['png'] },
+                        { name: 'All Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] },
+                        { name: 'All Files', extensions: ['*'] }
+                    ]
+                });
+                if (filePaths && filePaths.length > 0) {
+                    document.getElementById('metaFilePath').value = filePaths[0];
+                    setLastPath('metaFile', getDirFromPath(filePaths[0]));
+                }
+            } catch (err) {
+                console.error('File dialog selection failed:', err);
+            }
+        }
+
+        async function applyMetadata() {
+            const metaPath = document.getElementById('metaFilePath').value;
+            if (!metaPath) {
+                appendLog('Please select a metadata file first.', 'error');
+                return;
+            }
+            const mode = document.querySelector('input[name="imgMode"]:checked').value;
+            
+            if (mode === 'modify') {
+                const filename = metaPath.split(/[\\/]/).pop();
+                const prefix = `modify image "${filename}":\n`;
+                document.getElementById('promptTarget').value = prefix;
+                selectedFilesList = [metaPath];
+                renderUploadFilesPreviews();
+                
+                await api.saveConfig({
+                    prompt: prefix,
+                    selected_files: [metaPath],
+                    _image_ref_mode_value: 'modify image'
+                });
+                appendLog(`Modify image mode applied: prompt prefix set, upload list updated to ${filename}`, 'success');
+            } else {
+                try {
+                    const metadata = await api.getImageMetadata(metaPath);
+                    const updates = {};
+                    if (metadata.prompt) {
+                        document.getElementById('promptTarget').value = metadata.prompt;
+                        updates.prompt = metadata.prompt;
+                    }
+                    if (metadata.url) {
+                        let cleanUrl = metadata.url;
+                        if (!cleanUrl.startsWith('https://gemini.google.com/gem/')) {
+                            cleanUrl = 'https://gemini.google.com';
+                        }
+                        document.getElementById('urlInput').value = cleanUrl;
+                        updates.browser_url = cleanUrl;
+                    }
+                    if (metadata.upload_path) {
+                        const paths = metadata.upload_path.split(',').map(p => p.trim()).filter(p => p);
+                        selectedFilesList = paths;
+                        renderUploadFilesPreviews();
+                        updates.selected_files = paths;
+                    }
+                    if (metadata.aspect_ratio) {
+                        updates.fixed_aspect_ratio = metadata.aspect_ratio;
+                        document.getElementById('arFixedSelect').value = metadata.aspect_ratio;
+                        document.getElementById('arModeFixed').checked = true;
+                        updates.prompt_matrix = { enabled: false };
+                    }
+                    updates._image_ref_mode_value = 'extract metadata from image';
+                    await api.saveConfig(updates);
+                    appendLog(`Metadata applied from ${metaPath.split(/[\\/]/).pop()}`, 'success');
+                } catch (err) {
+                    appendLog(`Failed to parse/apply image metadata: ${err.message}`, 'error');
+                }
+            }
+        }
+
+        // 3. PRESET TEMPLATES
+        async function browsePresetFile() {
+            try {
+                const lastDir = getLastPath('presetFile');
+                const filePaths = await window.electronAPI.selectFile({
+                    title: 'Select Preset File',
+                    defaultPath: lastDir,
+                    filters: [
+                        { name: 'Preset Files', extensions: ['preset'] },
+                        { name: 'All Files', extensions: ['*'] }
+                    ]
+                });
+                if (filePaths && filePaths.length > 0) {
+                    document.getElementById('presetFilePath').value = filePaths[0];
+                    setLastPath('presetFile', getDirFromPath(filePaths[0]));
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function createNewPreset() {
+            try {
+                const lastDir = getLastPath('presetNew');
+                const targetPath = await window.electronAPI.saveFile({
+                    title: 'Create New Preset File',
+                    defaultPath: lastDir ? lastDir + '\\my_preset.preset' : 'my_preset.preset',
+                    filters: [
+                        { name: 'Preset Files', extensions: ['preset'] }
+                    ]
+                });
+                if (targetPath) {
+                    const defaultData = {
+                        browser_url: '',
+                        fixed_aspect_ratio: '',
+                        prompt: '',
+                        selected_files: []
+                    };
+                    await api.savePreset(targetPath, defaultData);
+                    document.getElementById('presetFilePath').value = targetPath;
+                    setLastPath('presetNew', getDirFromPath(targetPath));
+                    setLastPath('presetFile', getDirFromPath(targetPath));
+                    appendLog(`New preset created: ${targetPath}`, 'success');
+                }
+            } catch (err) {
+                appendLog(`Failed to create preset: ${err.message}`, 'error');
+            }
+        }
+
+        async function savePreset() {
+            const presetPath = document.getElementById('presetFilePath').value;
+            if (!presetPath) {
+                appendLog('Please select or create a preset file first.', 'error');
+                return;
+            }
+            try {
+                const config = await api.getConfig();
+                const presetData = {
+                    browser_url: config.browser_url || '',
+                    fixed_aspect_ratio: config.fixed_aspect_ratio || '',
+                    prompt: config.prompt || '',
+                    selected_files: config.selected_files || []
+                };
+                await api.savePreset(presetPath, presetData);
+                appendLog(`Preset saved to: ${presetPath}`, 'success');
+            } catch (err) {
+                appendLog(`Failed to save preset: ${err.message}`, 'error');
+            }
+        }
+
+        async function savePresetAs() {
+            try {
+                const lastDir = getLastPath('presetSaveAs') || getLastPath('presetFile');
+                const targetPath = await window.electronAPI.saveFile({
+                    title: 'Save Preset As',
+                    defaultPath: lastDir ? lastDir + '\\my_preset.preset' : 'my_preset.preset',
+                    filters: [
+                        { name: 'Preset Files', extensions: ['preset'] }
+                    ]
+                });
+                if (targetPath) {
+                    const config = await api.getConfig();
+                    const presetData = {
+                        browser_url: config.browser_url || '',
+                        fixed_aspect_ratio: config.fixed_aspect_ratio || '',
+                        prompt: config.prompt || '',
+                        selected_files: config.selected_files || []
+                    };
+                    await api.savePreset(targetPath, presetData);
+                    document.getElementById('presetFilePath').value = targetPath;
+                    setLastPath('presetSaveAs', getDirFromPath(targetPath));
+                    setLastPath('presetFile', getDirFromPath(targetPath));
+                    appendLog(`Preset saved to: ${targetPath}`, 'success');
+                }
+            } catch (err) {
+                appendLog(`Failed to save preset: ${err.message}`, 'error');
+            }
+        }
+
+        async function applyPreset() {
+            const presetPath = document.getElementById('presetFilePath').value;
+            if (!presetPath) {
+                appendLog('Please select a preset file first.', 'error');
+                return;
+            }
+            try {
+                const preset = await api.getPreset(presetPath);
+                const updates = {};
+                if (preset.browser_url) {
+                    document.getElementById('urlInput').value = preset.browser_url;
+                    updates.browser_url = preset.browser_url;
+                }
+                if (preset.fixed_aspect_ratio) {
+                    document.getElementById('arFixedSelect').value = preset.fixed_aspect_ratio;
+                    document.getElementById('arModeFixed').checked = true;
+                    updates.fixed_aspect_ratio = preset.fixed_aspect_ratio;
+                    updates.prompt_matrix = { enabled: false };
+                }
+                if (preset.prompt) {
+                    document.getElementById('promptTarget').value = preset.prompt;
+                    updates.prompt = preset.prompt;
+                }
+                if (preset.selected_files) {
+                    selectedFilesList = preset.selected_files;
+                    renderUploadFilesPreviews();
+                    updates.selected_files = preset.selected_files;
+                }
+                await api.saveConfig(updates);
+                appendLog(`Preset applied from: ${presetPath}`, 'success');
+            } catch (err) {
+                appendLog(`Failed to apply preset: ${err.message}`, 'error');
+            }
+        }
+
+        // 4. BROWSER URL
+        async function loadUrlFromConfig() {
+            try {
+                const config = await api.getConfig();
+                if (config.browser_url) {
+                    document.getElementById('urlInput').value = config.browser_url;
+                    updateExtractedTitleLabel(config.browser_url);
+                    appendLog('Loaded URL from config.', 'info');
+                }
+            } catch (err) {
+                appendLog('Failed to load URL from config.', 'error');
+            }
+        }
+
+        async function saveUrlToConfig() {
+            const url = document.getElementById('urlInput').value;
+            await saveConfigField('browser_url', url);
+        }
+
+        async function navigate() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) return;
+            try {
+                appendLog(`Navigating to ${url}...`, 'info');
+                await api.navigate(url);
+                appendLog('Navigation command sent.', 'success');
+                updateExtractedTitleLabel(url);
+            } catch (err) {
+                appendLog('Navigation failed: ' + err.message, 'error');
+            }
+        }
+
+        async function updateExtractedTitleLabel(url) {
+            // Extracted Title functionality disabled
+        }
+
+        // 5. ASPECT RATIO SETTING
+        async function toggleArMode(isDynamic) {
+            const pm = localConfig.prompt_matrix || {};
+            pm.enabled = isDynamic;
+            await saveConfigField('prompt_matrix', pm);
+            
+            const stats = await api.getAutomationStats();
+            if (stats && stats.is_running) {
+                await api.requestNewChat();
+                appendLog('Mode Selection updated. Will apply on next cycle.', 'info');
+            }
+        }
+
+        async function saveFixedAspectRatio(val) {
+            if (isConfigLoading) return;
+            await saveConfigField('fixed_aspect_ratio', val);
+            try {
+                const stats = await api.getAutomationStats();
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Fixed Ratio updated. Will apply on next cycle.', 'info');
+                }
+            } catch (e) {}
+        }
+
+        // AR MATRIX MODAL MANAGEMENT
+        function openArModal() {
+            document.getElementById('arModal').classList.remove('hidden');
+            const pm = localConfig.prompt_matrix || {};
+            localPromptMatrixItems = JSON.parse(JSON.stringify(pm.items || [
+                { ratio: '16:9 (Landscape)', target: 5, current: 0 },
+                { ratio: '9:16 (Portrait)', target: 5, current: 0 },
+                { ratio: '1:1 (Square)', target: 5, current: 0 }
+            ]));
+            
+            let activeIdx = -1;
+            for (let i = 0; i < localPromptMatrixItems.length; i++) {
+                if (localPromptMatrixItems[i].current < localPromptMatrixItems[i].target) {
+                    activeIdx = i;
+                    break;
+                }
+            }
+            if (activeIdx === -1) activeIdx = 0;
+            
+            localPromptMatrixItems.forEach((it, i) => {
+                it.active = (i === activeIdx);
+            });
+            
+            renderArTableBody();
+        }
+
+        function closeArModal() {
+            document.getElementById('arModal').classList.add('hidden');
+        }
+
+        function renderArTableBody() {
+            const tbody = document.getElementById('arTableBody');
+            tbody.innerHTML = '';
+            
+            const options = [
+                '16:9 (Landscape)', '9:16 (Portrait)', '1:1 (Square)',
+                '4:3 (Landscape)', '3:4 (Portrait)', '21:9 (Ultrawide)',
+                '3:2 (Landscape)', '2:3 (Portrait)', 'None (Master Prompt)'
+            ];
+            
+            localPromptMatrixItems.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                
+                let selectHtml = `<select onchange="updateArItemField(${index}, 'ratio', this.value)">`;
+                options.forEach(opt => {
+                    selectHtml += `<option value="${opt}" ${item.ratio === opt ? 'selected' : ''}>${opt}</option>`;
+                });
+                selectHtml += `</select>`;
+                
+                tr.innerHTML = `
+                    <td>${selectHtml}</td>
+                    <td><input type="number" min="1" value="${item.target}" onchange="updateArItemField(${index}, 'target', parseInt(this.value) || 1)"></td>
+                    <td><input type="number" min="0" value="${item.current}" onchange="updateArItemField(${index}, 'current', parseInt(this.value) || 0)"></td>
+                    <td style="text-align:center;"><input type="checkbox" ${item.active ? 'checked' : ''} onchange="setActiveArItem(${index}, this.checked)"></td>
+                    <td><button class="btn" style="padding: 2px 6px; font-size: 11px;" onclick="deleteArRow(${index})">🗑️</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateArItemField(index, field, value) {
+            if (localPromptMatrixItems[index]) {
+                localPromptMatrixItems[index][field] = value;
+            }
+        }
+
+        function setActiveArItem(index, checked) {
+            localPromptMatrixItems.forEach((it, i) => {
+                it.active = (i === index && checked);
+            });
+            renderArTableBody();
+        }
+
+        function deleteArRow(index) {
+            localPromptMatrixItems.splice(index, 1);
+            renderArTableBody();
+        }
+
+        function addRowArTable() {
+            localPromptMatrixItems.push({
+                ratio: '16:9 (Landscape)',
+                target: 5,
+                current: 0,
+                active: localPromptMatrixItems.length === 0
+            });
+            renderArTableBody();
+        }
+
+        function resetArCounts() {
+            localPromptMatrixItems.forEach(it => {
+                it.current = 0;
+            });
+            renderArTableBody();
+        }
+
+        async function saveArTable() {
+            try {
+                const pm = localConfig.prompt_matrix || {};
+                let newActiveIdx = 0;
+                localPromptMatrixItems.forEach((it, i) => {
+                    if (it.active) newActiveIdx = i;
+                });
+                
+                const finalItems = localPromptMatrixItems.map((r, i) => {
+                    let target = parseInt(r.target) || 1;
+                    let current = parseInt(r.current) || 0;
+                    
+                    if (i < newActiveIdx && current < target) {
+                        current = target;
+                    } else if (i === newActiveIdx && current >= target) {
+                        current = 0;
+                    }
+                    
+                    return {
+                        ratio: r.ratio || 'None (Master Prompt)',
+                        target: target,
+                        current: current
+                    };
+                });
+                
+                pm.items = finalItems;
+                await api.saveConfig({ prompt_matrix: pm });
+                
+                const stats = await api.getAutomationStats();
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Prompt Matrix config updated. Will apply on next cycle.', 'info');
+                } else {
+                    appendLog('Prompt Matrix saved successfully.', 'success');
+                }
+                
+                closeArModal();
+                loadConfigFromServer();
+            } catch (err) {
+                appendLog(`Failed to save matrix: ${err.message}`, 'error');
+            }
+        }
+
+        // 6. PROMPT
+        async function loadPromptFromConfig() {
+            try {
+                const config = await api.getConfig();
+                if (config.prompt !== undefined) {
+                    document.getElementById('promptTarget').value = config.prompt;
+                    appendLog('Loaded prompt from config.', 'info');
+                }
+            } catch (err) {
+                appendLog('Failed to load prompt.', 'error');
+            }
+        }
+
+        async function savePromptToConfig() {
+            const text = document.getElementById('promptTarget').value;
+            await saveConfigField('prompt', text);
+            
+            const stats = await api.getAutomationStats();
+            if (stats && stats.is_running) {
+                await api.requestNewChat();
+                appendLog('Prompt saved. Will apply on next cycle.', 'info');
+            }
+        }
+
+        async function sendPromptToBrowser() {
+            const text = document.getElementById('promptTarget').value;
+            try {
+                appendLog(`Filling prompt into browser: ${text.substring(0, 30)}...`, 'info');
+                await api.setPrompt(text, 'default');
+                appendLog('Prompt filled successfully.', 'success');
+            } catch (err) {
+                appendLog(`Send prompt failed: ${err.message}`, 'error');
+            }
+        }
+
+        // 7. TOOL & MODEL SELECTION
+        function updateSubToolOptions() {
+            const toolSelect = document.getElementById('toolSelect');
+            const subToolSelect = document.getElementById('subToolSelect');
+            if (!toolSelect || !subToolSelect) return;
+            
+            const selectedTool = toolSelect.value;
+            const subToolsMap = (localConfig && localConfig.discovery && localConfig.discovery.sub_tools) || {};
+            const subOptions = subToolsMap[selectedTool] || [];
+            
+            subToolSelect.innerHTML = '';
+            
+            // Add default option
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = 'None';
+            subToolSelect.appendChild(defaultOpt);
+            
+            subOptions.forEach(optVal => {
+                const opt = document.createElement('option');
+                opt.value = optVal;
+                opt.textContent = optVal;
+                if (localConfig && localConfig.selected_sub_tool === optVal) {
+                    opt.selected = true;
+                }
+                subToolSelect.appendChild(opt);
+            });
+            
+            // Disable if no options
+            subToolSelect.disabled = (subOptions.length === 0);
+        }
+
+        function populateDiscoverySelects(config) {
+            const discovery = config.discovery || {};
+            const availModels = discovery.available_models || [];
+            const availTools = discovery.available_tools || [];
+            const availThinkingLevels = discovery.available_thinking_levels || [];
+            
+            const selModel = config.selected_model || '';
+            const selTool = config.selected_tool || '';
+            const selSubTool = config.selected_sub_tool || '';
+            const selThinking = config.selected_thinking_level || '';
+            
+            const toolSelect = document.getElementById('toolSelect');
+            const subToolSelect = document.getElementById('subToolSelect');
+            const modelSelect = document.getElementById('modelSelect');
+            const thinkingLevelSelect = document.getElementById('thinkingLevelSelect');
+            
+            if (toolSelect) {
+                toolSelect.innerHTML = '';
+                const allTools = [...new Set(availTools.filter(t => t && t !== 'Default'))];
+                allTools.unshift(''); // Default option
+                allTools.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t ? t : 'Default Tool';
+                    if (t === selTool) opt.selected = true;
+                    toolSelect.appendChild(opt);
+                });
+            }
+            
+            if (modelSelect) {
+                modelSelect.innerHTML = '';
+                const allModels = [...new Set(availModels.filter(m => m))];
+                allModels.unshift(''); // Default option
+                allModels.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m ? m : 'Default Model';
+                    if (m === selModel) opt.selected = true;
+                    modelSelect.appendChild(opt);
+                });
+                if (allModels.length <= 1 && selModel) {
+                    const opt = document.createElement('option');
+                    opt.value = selModel;
+                    opt.textContent = selModel;
+                    opt.selected = true;
+                    modelSelect.appendChild(opt);
+                }
+            }
+            
+            if (thinkingLevelSelect) {
+                thinkingLevelSelect.innerHTML = '';
+                const allThinking = [...new Set(availThinkingLevels.filter(tl => tl))];
+                allThinking.unshift(''); // Default option
+                allThinking.forEach(tl => {
+                    const opt = document.createElement('option');
+                    opt.value = tl;
+                    opt.textContent = tl ? tl : 'Default Thinking Level';
+                    if (tl === selThinking) opt.selected = true;
+                    thinkingLevelSelect.appendChild(opt);
+                });
+                if (allThinking.length <= 1 && selThinking) {
+                    const opt = document.createElement('option');
+                    opt.value = selThinking;
+                    opt.textContent = selThinking;
+                    opt.selected = true;
+                    thinkingLevelSelect.appendChild(opt);
+                }
+            }
+            
+            // Populate sub tools based on selected main tool
+            updateSubToolOptions();
+        }
+
+        async function discoverCapabilities() {
+            try {
+                appendLog('Discovering available models and tools...', 'info');
+                await api.discoverCapabilities();
+                appendLog('Discovery complete.', 'success');
+                loadConfigFromServer();
+            } catch (err) {
+                appendLog(`Discovery failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function saveToolModelSettings() {
+            const tool = document.getElementById('toolSelect').value;
+            const subTool = document.getElementById('subToolSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const thinkingLevel = document.getElementById('thinkingLevelSelect').value;
+            
+            await saveConfigField('selected_tool', tool);
+            await saveConfigField('selected_sub_tool', subTool);
+            await saveConfigField('selected_model', model);
+            await saveConfigField('selected_thinking_level', thinkingLevel);
+            
+            const stats = await api.getAutomationStats();
+            if (stats && stats.is_running) {
+                await api.requestNewChat();
+                appendLog('Tool/Model/Thinking settings saved. Will apply on next cycle.', 'info');
+            } else {
+                appendLog('Tool/Model/Thinking settings saved.', 'success');
+            }
+        }
+
+        async function applyToolModelSettings() {
+            const tool = document.getElementById('toolSelect').value;
+            const subTool = document.getElementById('subToolSelect').value;
+            const model = document.getElementById('modelSelect').value;
+            const thinkingLevel = document.getElementById('thinkingLevelSelect').value;
+            try {
+                const toolToApply = subTool || tool;
+                appendLog(`Applying browser settings: ${model} / ${toolToApply} / ${thinkingLevel}...`, 'info');
+                const resp = await api.applySettings({ model, tool: toolToApply, thinking_level: thinkingLevel });
+                if (resp.status === 'success') {
+                    appendLog('Settings applied successfully.', 'success');
+                } else {
+                    appendLog(`Apply failed: ${resp.message}`, 'error');
+                }
+            } catch (err) {
+                appendLog(`Apply failed: ${err.message}`, 'error');
+            }
+        }
+
+        // 8. UPLOAD FILES TO BROWSER
+        async function addUploadFiles() {
+            try {
+                const lastDir = getLastPath('uploadFiles');
+                const filePaths = await window.electronAPI.selectFile({
+                    title: 'Select Images to Upload',
+                    defaultPath: lastDir,
+                    properties: ['multiSelections'],
+                    filters: [
+                        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }
+                    ]
+                });
+                if (filePaths && filePaths.length > 0) {
+                    filePaths.forEach(fp => {
+                        if (!selectedFilesList.includes(fp)) {
+                            selectedFilesList.push(fp);
+                        }
+                    });
+                    setLastPath('uploadFiles', getDirFromPath(filePaths[0]));
+                    await api.saveConfig({ selected_files: selectedFilesList });
+                    renderUploadFilesPreviews();
+                    appendLog(`Added ${filePaths.length} files to upload queue.`, 'success');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        let currentModalImagePath = "";
+
+        function openImageModal(filePath) {
+            currentModalImagePath = filePath;
+            const modal = document.getElementById('imagePreviewModal');
+            const img = document.getElementById('imagePreviewImg');
+            const title = document.getElementById('imagePreviewTitle');
+            const pathLabel = document.getElementById('imagePreviewFilePath');
+            if (modal && img && title) {
+                const filename = filePath.split(/[\\/]/).pop();
+                title.textContent = filename;
+                if (pathLabel) {
+                    pathLabel.textContent = filePath;
+                    pathLabel.title = filePath;
+                }
+                img.src = `file:///${filePath.replace(/\\/g, '/')}`;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imagePreviewModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        async function openInSystemViewer() {
+            if (currentModalImagePath) {
+                try {
+                    await window.electronAPI.openFile(currentModalImagePath);
+                } catch (err) {
+                    console.error("Failed to open file in system viewer:", err);
+                }
+            }
+        }
+
+        async function showInExplorer() {
+            if (currentModalImagePath) {
+                try {
+                    await window.electronAPI.showItemInFolder(currentModalImagePath);
+                } catch (err) {
+                    console.error("Failed to show item in folder:", err);
+                }
+            }
+        }
+
+        function renderUploadFilesPreviews() {
+            const previewContainer = document.getElementById('uploadFilesPreview');
+            if (!previewContainer) return;
+            previewContainer.innerHTML = '';
+            
+            if (selectedFilesList.length === 0) {
+                previewContainer.innerHTML = '<span class="text-muted text-small" style="grid-column: 1 / -1; text-align: center; padding: 20px; width: 100%;">No files selected</span>';
+                return;
+            }
+            
+            selectedFilesList.forEach(fp => {
+                const filename = fp.split(/[\\/]/).pop();
+                const card = document.createElement('div');
+                card.className = 'file-preview-card d-flex flex-column gap-8 relative';
+                card.style.border = '1px solid var(--border)';
+                card.style.borderRadius = '6px';
+                card.style.padding = '8px';
+                card.style.background = 'rgba(0,0,0,0.2)';
+                card.style.textAlign = 'center';
+                card.style.minWidth = '0';
+                card.style.cursor = 'pointer';
+                
+                card.onclick = (e) => {
+                    // Prevent triggering click when clicking the delete button or nested elements
+                    if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) {
+                        return;
+                    }
+                    openImageModal(fp);
+                };
+                
+                card.style.position = 'relative';
+                card.innerHTML = `
+                    <button onclick="removeUploadFile('${fp.replace(/\\/g, '\\\\')}'); event.stopPropagation();" title="Remove" style="
+                        position: absolute; top: 4px; right: 4px;
+                        width: 18px; height: 18px;
+                        border-radius: 50%;
+                        background: rgba(220, 53, 69, 0.85);
+                        border: none; cursor: pointer;
+                        color: #fff; font-size: 12px; line-height: 1;
+                        display: flex; align-items: center; justify-content: center;
+                        padding: 0; z-index: 2;
+                        transition: background 0.15s, transform 0.15s;
+                    " onmouseover="this.style.background='rgba(220,53,69,1)';this.style.transform='scale(1.15)'" onmouseout="this.style.background='rgba(220,53,69,0.85)';this.style.transform='scale(1)'">&#x2715;</button>
+                    <img class="preview-thumb" src="file:///${fp.replace(/\\/g, '/')}" style="width: 100%; height: 70px; object-fit: contain; border-radius: 4px; background-color: rgba(0,0,0,0.35);">
+                    <span class="text-small text-muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-weight: 500;">${filename}</span>
+                `;
+                previewContainer.appendChild(card);
+            });
+        }
+
+        async function removeUploadFile(path) {
+            selectedFilesList = selectedFilesList.filter(p => p !== path);
+            await api.saveConfig({ selected_files: selectedFilesList });
+            renderUploadFilesPreviews();
+            appendLog(`Removed file from queue.`, 'info');
+        }
+
+        async function clearUploadFiles() {
+            try {
+                appendLog('Clearing browser attachments...', 'info');
+                await api.clearAttachments();
+                selectedFilesList = [];
+                await api.saveConfig({ selected_files: [] });
+                renderUploadFilesPreviews();
+                appendLog('All upload queue and attachments cleared.', 'success');
+            } catch (err) {
+                appendLog(`Clear attachments failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function sendUploadFiles() {
+            if (selectedFilesList.length === 0) {
+                appendLog('No files to send.', 'error');
+                return;
+            }
+            try {
+                appendLog(`Syncing ${selectedFilesList.length} files with browser...`, 'info');
+                const resp = await api.attachFiles(selectedFilesList);
+                appendLog(`Sync complete: Added ${resp.added}, Removed ${resp.removed}`, 'success');
+            } catch (err) {
+                appendLog(`Sync attachments failed: ${err.message}`, 'error');
+            }
+        }
+
+        // 9. STORAGE NAMING & AUTOMATION FIELDS SAVE
+        async function browseSaveDir() {
+            try {
+                const lastDir = getLastPath('saveDir');
+                const dirPaths = await window.electronAPI.selectDirectory({
+                    title: 'Select Save Directory',
+                    defaultPath: lastDir,
+                    properties: ['openDirectory']
+                });
+                if (dirPaths && dirPaths.length > 0) {
+                    document.getElementById('saveDirInput').value = dirPaths[0];
+                    setLastPath('saveDir', dirPaths[0]);
+                    await api.saveConfig({ save_dir: dirPaths[0] });
+                    appendLog(`Save directory updated: ${dirPaths[0]}`, 'success');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function saveNamingFields() {
+            if (isConfigLoading) return;
+            const saveDir = document.getElementById('saveDirInput').value;
+            const prefix = document.getElementById('filePrefixInput').value;
+            const padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+            const startVal = parseInt(document.getElementById('nameStartInput').value);
+            const start = isNaN(startVal) ? 1 : startVal;
+            const trackLastFileNum = document.getElementById('trackLastFileNumToggle').checked;
+            
+            await api.saveConfig({
+                save_dir: saveDir,
+                name_prefix: prefix,
+                name_padding: padding,
+                name_start: start,
+                track_last_file_num: trackLastFileNum
+            });
+        }
+
+        async function saveWatermarkSettings() {
+            if (isConfigLoading) return;
+            const removeWm = document.getElementById('removeWmToggle').checked;
+            const useGpu = document.getElementById('useGpuToggle').checked;
+            
+            const auto = localConfig.automation || {};
+            auto.remove_watermark = removeWm;
+            auto.use_gpu = useGpu;
+            
+            await api.saveConfig({ automation: auto });
+            appendLog(`Watermark / GPU preferences saved.`, 'success');
+        }
+
+        async function triggerCaptureDom() {
+            try {
+                appendLog('Capturing browser DOM...', 'info');
+                const res = await api.captureDom();
+                appendLog(`DOM saved to: ${res.path}`, 'success');
+            } catch (err) {
+                appendLog('DOM capture failed: ' + err.message, 'error');
+            }
+        }
+
+        async function saveAutomationSettings() {
+            if (isConfigLoading) return;
+            const autoLooping = document.getElementById('autoLoopingToggle').checked;
+            const modeEl = document.querySelector('input[name="stopCondition"]:checked');
+            const mode = modeEl ? modeEl.value : 'rounds';
+            const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
+            
+            const auto = localConfig.automation || {};
+            auto.auto_looping = autoLooping;
+            auto.mode = mode;
+            auto.goal = goal;
+            
+            await api.saveConfig({ automation: auto });
+        }
+
+        async function saveContinueSessionPreference() {
+            if (isConfigLoading) return;
+            const clearPending = document.getElementById('continue_opt_reset').checked;
+            const auto = localConfig.automation || {};
+            auto.continue_clear_pending = clearPending;
+            const newConfig = await api.saveConfig({ automation: auto });
+            localConfig = newConfig;
+        }
+
+        // 10. SINGLE ACTION CONTROL BACKGROUND CONTROLLERS
+        function setBusy(busy) {
+            isGeneratingBusy = busy;
+            const badge = document.getElementById('autoStatusBadge');
+            const isAutomationRunning = badge && badge.innerText === 'RUNNING';
+            
+            const buttonsToDisable = [
+                document.getElementById('btnNewChat'),
+                document.getElementById('btnSubmitPrompt'),
+                document.getElementById('btnUploadFile'),
+                document.getElementById('btnSubmit'),
+                document.getElementById('btnRedo'),
+                document.getElementById('btnSubmitTop'),
+                document.getElementById('btnRedoTop'),
+                document.getElementById('btnCombineSubmit'),
+                document.getElementById('btnCombineRedo')
+            ];
+            buttonsToDisable.forEach(b => {
+                if (b) b.disabled = busy || isAutomationRunning;
+            });
+            
+            const spinner = document.getElementById('actionsLoadingSpinner');
+            if (spinner) {
+                spinner.className = busy ? 'spinner' : 'hidden';
+            }
+            const combineSpinner = document.getElementById('combineActionsLoadingSpinner');
+            if (combineSpinner) {
+                combineSpinner.className = busy ? 'spinner' : 'hidden';
+            }
+        }
+
+        async function triggerCombineSubmit() {
+            if (isGeneratingBusy) return;
+            setBusy(true);
+            try {
+                appendLog('Combined Action: Triggering New Chat...', 'info');
+                const chatResp = await api.newChat();
+                appendLog(`Combined Action: New Chat status: ${chatResp.message}`, 'success');
+                
+                await new Promise(r => setTimeout(r, 1000));
+                
+                if (selectedFilesList && selectedFilesList.length > 0) {
+                    appendLog(`Combined Action: Syncing ${selectedFilesList.length} files with browser...`, 'info');
+                    const attachResp = await api.attachFiles(selectedFilesList);
+                    appendLog(`Combined Action: Sync complete: Added ${attachResp.added}, Removed ${attachResp.removed}`, 'success');
+                    
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    appendLog('Combined Action: No files in queue, skipping upload step.', 'info');
+                }
+                
+                // Allow triggerSubmit() to run by setting isGeneratingBusy to false before calling it
+                isGeneratingBusy = false;
+                await triggerSubmit();
+            } catch (err) {
+                appendLog(`Combined Action Failed: ${err.message}`, 'error');
+                setBusy(false);
+            }
+        }
+
+        async function triggerSubmit() {
+            if (isGeneratingBusy) return;
+            setBusy(true);
+            appendLog('Submitting prompt (Background)...', 'info');
+            try {
+                const promptText = document.getElementById('promptTarget').value;
+                
+                // Resolve Aspect Ratio for injection
+                let ratioPrefix = '';
+                const arModeDynamic = document.getElementById('arModeDynamic').checked;
+                if (arModeDynamic) {
+                    const pm = localConfig.prompt_matrix || {};
+                    const items = pm.items || [];
+                    let activeIdx = -1;
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].current < (items[i].target || 1)) {
+                            activeIdx = i;
+                            break;
+                        }
+                    }
+                    if (activeIdx !== -1) {
+                        ratioPrefix = items[activeIdx].ratio || '';
+                    }
+                } else {
+                    const fixedAr = document.getElementById('arFixedSelect').value;
+                    if (fixedAr && fixedAr !== 'None') {
+                        ratioPrefix = fixedAr;
+                    }
+                }
+
+                // Strip existing prefix if any, and prepend active ratio instructions
+                const cleanPrompt = promptText.replace(/^Aspect Ratio:.*?\n\n/is, '');
+                let finalPrompt = cleanPrompt;
+                if (ratioPrefix) {
+                    finalPrompt = `Aspect Ratio: ${ratioPrefix}\n\n${cleanPrompt}`;
+                }
+
+                const res = await api.submitResponse(finalPrompt);
+                
+                if (res.status === 'success') {
+                    appendLog('SUCCESS: Image generated. Starting download...', 'success');
+                    
+                    const saveDir = document.getElementById('saveDirInput').value;
+                    const prefix = document.getElementById('filePrefixInput').value;
+                    const padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+                    const startVal = parseInt(document.getElementById('nameStartInput').value);
+                    const start = isNaN(startVal) ? 1 : startVal;
+                    
+                    const browserStatus = await api.getBrowserStatus();
+                    const url = browserStatus.url || '';
+                    const uploadPath = selectedFilesList.join(', ');
+                    
+                    const naming = { prefix, padding, start };
+                    const meta = { aspect_ratio: ratioPrefix, prompt: cleanPrompt, url, upload_path: uploadPath };
+                    
+                    const dlResp = await api.downloadImages(saveDir, naming, meta);
+                    if (dlResp.status === 'success') {
+                        const savedPaths = dlResp.saved_paths || [];
+                        appendLog(`DOWNLOADED: ${dlResp.count} images. Starting processing...`, 'success');
+                        
+                        // Increment prompt matrix count if dynamic mode is active and download succeeded
+                        if (arModeDynamic && ratioPrefix && dlResp.count > 0) {
+                            const pm = localConfig.prompt_matrix || {};
+                            const items = pm.items || [];
+                            let activeIdx = -1;
+                            for (let i = 0; i < items.length; i++) {
+                                if (items[i].current < (items[i].target || 1)) {
+                                    activeIdx = i;
+                                    break;
+                                }
+                            }
+                            if (activeIdx !== -1) {
+                                items[activeIdx].current += 1;
+                                pm.items = items;
+                                localConfig.prompt_matrix = pm;
+                                await api.saveConfig({ prompt_matrix: pm });
+                                appendLog(`Dynamic loop progress updated for ${ratioPrefix}: ${items[activeIdx].current}/${items[activeIdx].target}`, 'info');
+                            }
+                        }
+
+                        // ── Tray notification ────────────────────────────────
+                        if (window.electronAPI && dlResp.count > 0 && localConfig.notifications_enabled !== false) {
+                            const silent = localConfig.notification_sound_enabled === false;
+                            window.electronAPI.notifyDownload(dlResp.count, saveDir, silent, savedPaths[savedPaths.length - 1] || '');
+                        }
+
+                        const nextStart = dlResp.next_start || start;
+                        document.getElementById('nameStartInput').value = nextStart;
+                        await api.saveConfig({ name_start: nextStart });
+                        
+                        const removeWm = document.getElementById('removeWmToggle').checked;
+                        if (removeWm && savedPaths.length > 0) {
+                            const procResp = await api.processImages(savedPaths, saveDir);
+                            if (procResp.status === 'success') {
+                                appendLog(`CLEANED: ${procResp.processed_count} images.`, 'success');
+                            } else {
+                                appendLog(`CLEAN FAILED: ${JSON.stringify(procResp)}`, 'error');
+                            }
+                        }
+                    } else {
+                        appendLog(`DOWNLOAD FAILED: ${dlResp.message}`, 'error');
+                    }
+                } else {
+                    appendLog(`SUBMIT FAILED: ${res.message || 'Unknown error'}`, 'error');
+                }
+            } catch (err) {
+                appendLog(`ERROR during submit: ${err.message}`, 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function triggerRedo() {
+            if (isGeneratingBusy) return;
+            setBusy(true);
+            appendLog('Triggering REDO (Priority 1)...', 'info');
+            try {
+                const resp = await api.redoResponse();
+                if (resp.status === 'success') {
+                    appendLog('Redo active. Waiting for new images...', 'info');
+                    
+                    const waitResp = await api.submitResponse(null);
+                    if (waitResp.status === 'success') {
+                        appendLog('New images detected. Downloading...', 'success');
+                        
+                        const saveDir = document.getElementById('saveDirInput').value;
+                        const prefix = document.getElementById('filePrefixInput').value;
+                        const padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+                        const startVal = parseInt(document.getElementById('nameStartInput').value);
+                        const start = isNaN(startVal) ? 1 : startVal;
+                        
+                        const fixedAr = document.getElementById('arFixedSelect').value;
+                        const arVal = (fixedAr && fixedAr !== 'None') ? fixedAr : '';
+                        
+                        const promptText = document.getElementById('promptTarget').value;
+                        const cleanPrompt = promptText.replace(/^Aspect Ratio:.*?\n\n/is, '');
+                        
+                        const browserStatus = await api.getBrowserStatus();
+                        const url = browserStatus.url || '';
+                        const uploadPath = selectedFilesList.join(', ');
+                        
+                        const naming = { prefix, padding, start };
+                        const meta = { aspect_ratio: arVal, prompt: cleanPrompt, url, upload_path: uploadPath };
+                        
+                        const dlResp = await api.downloadImages(saveDir, naming, meta);
+                        if (dlResp.status === 'success') {
+                            const savedPaths = dlResp.saved_paths || [];
+                            appendLog(`DOWNLOADED: ${dlResp.count} images.`, 'success');
+
+                            // ── Tray notification ────────────────────────────
+                            if (window.electronAPI && dlResp.count > 0 && localConfig.notifications_enabled !== false) {
+                                const silent = localConfig.notification_sound_enabled === false;
+                                window.electronAPI.notifyDownload(dlResp.count, saveDir, silent, savedPaths[savedPaths.length - 1] || '');
+                            }
+                            
+                            const nextStart = dlResp.next_start || start;
+                            document.getElementById('nameStartInput').value = nextStart;
+                            await api.saveConfig({ name_start: nextStart });
+                            
+                            const removeWm = document.getElementById('removeWmToggle').checked;
+                            if (removeWm && savedPaths.length > 0) {
+                                const procResp = await api.processImages(savedPaths, saveDir);
+                                if (procResp.status === 'success') {
+                                    appendLog(`CLEANED: ${procResp.processed_count} images.`, 'success');
+                                } else {
+                                    appendLog(`CLEAN FAILED: ${JSON.stringify(procResp)}`, 'error');
+                                }
+                            }
+                        } else {
+                            appendLog(`DOWNLOAD FAILED: ${dlResp.message}`, 'error');
+                        }
+                    } else {
+                        appendLog(`WAIT FAILED: ${waitResp.message}`, 'error');
+                    }
+                } else {
+                    appendLog(`REDO FAILED: ${resp.message}`, 'error');
+                }
+            } catch (err) {
+                appendLog(`ERROR during redo: ${err.message}`, 'error');
+            } finally {
+                setBusy(false);
+            }
+        }
+
+        async function triggerStopResponse() {
+            try {
+                appendLog('Sending stop command...', 'warn');
+                setBusy(false);
+                const resp = await api.stopResponse();
+                appendLog(`STOPPED: ${resp.message}`, 'success');
+            } catch (err) {
+                appendLog(`Stop command failed: ${err.message}`, 'error');
+            }
+        }
+
+        async function triggerNewChat() {
+            try {
+                appendLog('Triggering New Chat...', 'info');
+                const resp = await api.newChat();
+                appendLog(`New Chat status: ${resp.message}`, 'success');
+            } catch (err) {
+                appendLog(`New Chat failed: ${err.message}`, 'error');
+            }
+        }
+
+        // 11. AUTOMATION PROCESS TRIGGERS
+        async function startSetupAutomation() {
+            baseSuccesses = null;
+            try {
+                appendLog('Triggering Automation Start...', 'info');
+                const modeEl = document.querySelector('input[name="stopCondition"]:checked');
+                const mode = modeEl ? modeEl.value : 'rounds';
+                const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
+                
+                const currentConfig = await api.getConfig();
+                currentConfig.selected_files = selectedFilesList;
+                currentConfig.prompt = document.getElementById('promptTarget').value;
+                currentConfig.selected_tool = document.getElementById('toolSelect').value;
+                currentConfig.selected_sub_tool = document.getElementById('subToolSelect').value;
+                currentConfig.selected_model = document.getElementById('modelSelect').value;
+                currentConfig.selected_thinking_level = document.getElementById('thinkingLevelSelect').value;
+                currentConfig.save_dir = document.getElementById('saveDirInput').value;
+                currentConfig.name_prefix = document.getElementById('filePrefixInput').value;
+                currentConfig.name_padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+                const startVal = parseInt(document.getElementById('nameStartInput').value);
+                currentConfig.name_start = isNaN(startVal) ? 1 : startVal;
+                currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
+                
+                const res = await api.startAutomation(mode, goal, currentConfig);
+                appendLog(`Start Automation result: ${res.message}`, 'success');
+                updateAutomationStats();
+            } catch (err) {
+                appendLog('Failed to start automation: ' + err.message, 'error');
+            }
+        }
+
+        async function stopSetupAutomation() {
+            try {
+                appendLog('Stopping automation...', 'warn');
+                const res = await api.stopAutomation();
+                appendLog(`Automation stop signal: ${res.message}`, 'success');
+                updateAutomationStats();
+            } catch (err) {
+                appendLog('Failed to stop automation: ' + err.message, 'error');
+            }
+        }
+
+        async function toggleStartStopAutomation() {
+            const btn = document.getElementById('btnStartStop');
+            if (btn && btn.innerText.includes('Stop')) {
+                await stopSetupAutomation();
+            } else {
+                await startSetupAutomation();
+            }
+        }
+
+        function openContinueModal() {
+            document.getElementById('continueModal').classList.remove('hidden');
+        }
+
+        function closeContinueModal() {
+            document.getElementById('continueModal').classList.add('hidden');
+        }
+
+        async function executeContinueAutomation(clearPending) {
+            baseSuccesses = null;
+            closeContinueModal();
+            try {
+                appendLog(`Continuing automation session (clearPending=${clearPending})...`, 'info');
+                const modeEl = document.querySelector('input[name="stopCondition"]:checked');
+                const mode = modeEl ? modeEl.value : 'rounds';
+                const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
+                
+                const currentConfig = await api.getConfig();
+                currentConfig.selected_files = selectedFilesList;
+                currentConfig.prompt = document.getElementById('promptTarget').value;
+                currentConfig.selected_tool = document.getElementById('toolSelect').value;
+                currentConfig.selected_sub_tool = document.getElementById('subToolSelect').value;
+                currentConfig.selected_model = document.getElementById('modelSelect').value;
+                currentConfig.selected_thinking_level = document.getElementById('thinkingLevelSelect').value;
+                currentConfig.save_dir = document.getElementById('saveDirInput').value;
+                currentConfig.name_prefix = document.getElementById('filePrefixInput').value;
+                currentConfig.name_padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+                const startVal = parseInt(document.getElementById('nameStartInput').value);
+                currentConfig.name_start = isNaN(startVal) ? 1 : startVal;
+                currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
+                
+                const res = await api.continueAutomation(mode, goal, currentConfig, clearPending);
+                appendLog(`Continue Automation status: ${res.message}`, 'success');
+                updateAutomationStats();
+            } catch (err) {
+                appendLog('Failed to continue automation: ' + err.message, 'error');
+            }
+        }
+
+        async function confirmContinueAutomation() {
+            const clearPending = document.getElementById('continue_opt_reset').checked;
+            await executeContinueAutomation(clearPending);
+        }
+
+        // 12. LOG VIEW AND STATS SYNCHRONIZER
+        function formatDuration(seconds) {
+            if (isNaN(seconds) || seconds < 0) return '0:00';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            return `${m}:${s.toString().padStart(2,'0')}`;
+        }
+
+        // Track last known automation image count for delta-notification
+        let _lastKnownSuccesses = 0;
+
+        async function updateAutomationStats() {
+            try {
+                const stats = await api.getAutomationStats();
+                if (stats) {
+                    const currentSuccesses = stats.successes || 0;
+                    document.getElementById('statCycles').textContent = stats.cycles || 0;
+                    document.getElementById('statImages').textContent = currentSuccesses;
+                    document.getElementById('statRefused').textContent = stats.refusals || 0;
+                    document.getElementById('statResets').textContent = stats.resets || 0;
+
+                    // Update newly downloaded images badge
+                    if (baseSuccesses === null) {
+                        baseSuccesses = currentSuccesses;
+                        localStorage.setItem('setup_cleared_successes', baseSuccesses);
+                    }
+
+                    if (currentSuccesses < baseSuccesses) {
+                        baseSuccesses = currentSuccesses;
+                        localStorage.setItem('setup_cleared_successes', baseSuccesses);
+                    }
+
+                    const newImagesBadge = document.getElementById('newImagesBadge');
+                    if (newImagesBadge) {
+                        const delta = currentSuccesses - baseSuccesses;
+                        if (delta > 0) {
+                            newImagesBadge.textContent = `+${delta}`;
+                            newImagesBadge.style.display = 'inline-flex';
+                        } else {
+                            newImagesBadge.style.display = 'none';
+                        }
+                    }
+
+                    // ── Tray notification on new automation images ────────────
+                    if (currentSuccesses > _lastKnownSuccesses && _lastKnownSuccesses > 0) {
+                        const delta = currentSuccesses - _lastKnownSuccesses;
+                        if (window.electronAPI && localConfig.notifications_enabled !== false) {
+                            const saveDir = document.getElementById('saveDirInput').value || '';
+                            const silent = localConfig.notification_sound_enabled === false;
+                            window.electronAPI.notifyDownload(delta, saveDir, silent);
+                        }
+                    }
+                    _lastKnownSuccesses = currentSuccesses;
+
+                    const badge = document.getElementById('autoStatusBadge');
+                    if (stats.is_running) {
+                        badge.className = 'job-status-badge conn-badge-connected';
+                        badge.innerHTML = 'RUNNING';
+                    } else if (stats.cycles > 0) {
+                        badge.className = 'job-status-badge conn-badge-disconnected';
+                        badge.innerHTML = 'IDLE / FINISHED';
+                    } else {
+                        badge.className = 'job-status-badge conn-badge-disconnected';
+                        badge.innerHTML = 'STANDBY';
+                    }
+
+                    // Update LC inputs disabled state
+                    updateLcInputsState(stats.is_running === true);
+
+                    // Update Send buttons disabled state
+                    updateSendButtonsState(stats.is_running === true);
+
+                    // Disable single action buttons when automation is running
+                    const isAutomationRunning = stats.is_running === true;
+                    const submitBtns = [document.getElementById('btnSubmit'), document.getElementById('btnSubmitTop'), document.getElementById('btnCombineSubmit')];
+                    const redoBtns = [document.getElementById('btnRedo'), document.getElementById('btnRedoTop'), document.getElementById('btnCombineRedo')];
+                    const stopBtns = [document.getElementById('btnStop'), document.getElementById('btnStopTop'), document.getElementById('btnCombineStop')];
+                    
+                    submitBtns.forEach(b => { if (b) b.disabled = isAutomationRunning || isGeneratingBusy; });
+                    redoBtns.forEach(b => { if (b) b.disabled = isAutomationRunning || isGeneratingBusy; });
+                    stopBtns.forEach(b => { if (b) b.disabled = isAutomationRunning; });
+
+                    // Update Start/Stop and Continue button states
+                    const btnStartStop = document.getElementById('btnStartStop');
+                    const btnContinue = document.getElementById('btnContinue');
+                    if (stats.is_running) {
+                        if (btnStartStop) {
+                            btnStartStop.innerText = '⏹ Stop Loop';
+                            btnStartStop.className = 'btn btn-danger flex-grow-1';
+                            btnStartStop.disabled = false;
+                        }
+                        if (btnContinue) {
+                            btnContinue.disabled = true;
+                        }
+                    } else {
+                        if (btnStartStop) {
+                            btnStartStop.innerText = '▶ Start Loop';
+                            btnStartStop.className = 'btn btn-primary flex-grow-1';
+                            btnStartStop.disabled = false;
+                        }
+                        if (btnContinue) {
+                            btnContinue.disabled = false;
+                        }
+                    }
+
+                    // Update time threshold live timer
+                    const timeEn = document.getElementById('lc_time_en').checked;
+                    const timerDisplay = document.getElementById('lcTimerDisplay');
+                    if (stats.is_running && timeEn && stats.lc_time_threshold_start_ts) {
+                        timerDisplay.style.display = 'flex';
+                        const elapsedSec = Math.max(0, Math.floor(Date.now() / 1000 - stats.lc_time_threshold_start_ts));
+                        const limitMin = parseInt(document.getElementById('lc_time_min').value) || 10;
+                        document.getElementById('lcTimerElapsed').textContent = formatDuration(elapsedSec);
+                        document.getElementById('lcTimerLimit').textContent = formatDuration(limitMin * 60);
+                    } else {
+                        timerDisplay.style.display = 'none';
+                    }
+                }
+            } catch(e) {
+                const badge = document.getElementById('autoStatusBadge');
+                if (badge) {
+                    badge.className = 'job-status-badge conn-badge-disconnected';
+                    badge.innerHTML = 'OFFLINE';
+                }
+                updateLcInputsState(false);
+                updateSendButtonsState(false);
+                
+                // Reset disabled states when offline
+                const submitBtns = [document.getElementById('btnSubmit'), document.getElementById('btnSubmitTop'), document.getElementById('btnCombineSubmit')];
+                const redoBtns = [document.getElementById('btnRedo'), document.getElementById('btnRedoTop'), document.getElementById('btnCombineRedo')];
+                const stopBtns = [document.getElementById('btnStop'), document.getElementById('btnStopTop'), document.getElementById('btnCombineStop')];
+                submitBtns.forEach(b => { if (b) b.disabled = isGeneratingBusy; });
+                redoBtns.forEach(b => { if (b) b.disabled = isGeneratingBusy; });
+                stopBtns.forEach(b => { if (b) b.disabled = false; });
+
+                const timerDisplay = document.getElementById('lcTimerDisplay');
+                if (timerDisplay) timerDisplay.style.display = 'none';
+
+                const btnStartStop = document.getElementById('btnStartStop');
+                const btnContinue = document.getElementById('btnContinue');
+                if (btnStartStop) {
+                    btnStartStop.innerText = '▶ Start Loop';
+                    btnStartStop.className = 'btn btn-primary flex-grow-1';
+                    btnStartStop.disabled = true;
+                }
+                if (btnContinue) {
+                    btnContinue.disabled = true;
+                }
+            }
+        }
+
+        let hasLoadedHistory = false;
+
+        async function refreshLogs() {
+            try {
+                const fetchHistory = !hasLoadedHistory;
+                const data = await api.getEngineLogs(fetchHistory);
+                const container = document.getElementById('setupLogContainer');
+                if (data.logs && data.logs.length > 0) {
+                    const reversedLogs = [...data.logs].reverse();
+                    const newHtml = reversedLogs.map(l => {
+                        let cls = 'info';
+                        if (l.toLowerCase().includes('error') || l.toLowerCase().includes('failed')) cls = 'error';
+                        else if (l.toLowerCase().includes('warn')) cls = 'warn';
+                        else if (l.toLowerCase().includes('success') || l.toLowerCase().includes('downloaded') || l.toLowerCase().includes('cleaned')) cls = 'success';
+                        return `<span class="${cls}">${l}</span>`;
+                    }).join('<br>') + '<br>';
+                    
+                    const isAtTop = container.scrollTop <= 15;
+                    if (fetchHistory) {
+                        container.innerHTML = newHtml;
+                        hasLoadedHistory = true;
+                        container.scrollTop = 0;
+                    } else {
+                        container.innerHTML = newHtml + container.innerHTML;
+                        if (isAtTop) {
+                            container.scrollTop = 0;
+                        }
+                    }
+                } else if (fetchHistory) {
+                    hasLoadedHistory = true;
+                    container.scrollTop = 0;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function clearSetupLogs() {
+            document.getElementById('setupLogContainer').innerHTML = '';
+        }
+
+        function appendLog(msg, type='info') {
+            const container = document.getElementById('setupLogContainer');
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            const logLine = `<span class="${type}">[${time}] ${msg}</span><br>`;
+            const isAtTop = container.scrollTop <= 15;
+            container.innerHTML = logLine + container.innerHTML;
+            if (isAtTop) {
+                setTimeout(() => {
+                    container.scrollTop = 0;
+                }, 50);
+            }
+        }
+
+        // 13. LOOP CONTROL HELPERS
+        async function saveLoopControlConfig() {
+            try {
+                if (!localConfig.automation) localConfig.automation = {};
+
+                const prev_time_enabled = localConfig.automation.loop_control
+                    ? localConfig.automation.loop_control.time_enabled : false;
+
+                const loop_control = {
+                    infinite_loop_enabled: document.getElementById('lc_inf_en').checked,
+                    infinite_loop_minutes: parseInt(document.getElementById('lc_inf_min').value) || 60,
+                    time_enabled: document.getElementById('lc_time_en').checked,
+                    time_minutes: parseInt(document.getElementById('lc_time_min').value) || 10,
+                    time_action: document.getElementById('lc_time_action').value,
+                    refused_enabled: document.getElementById('lc_ref_en').checked,
+                    refused_threshold: parseInt(document.getElementById('lc_ref_thr').value) || 5,
+                    refused_action: document.getElementById('lc_ref_action').value,
+                    reset_enabled: document.getElementById('lc_rst_en').checked,
+                    reset_threshold: parseInt(document.getElementById('lc_rst_thr').value) || 3,
+                    reset_action: document.getElementById('lc_rst_action').value
+                };
+
+                localConfig.automation.loop_control = loop_control;
+                const newConfig = await api.saveConfig({ automation: localConfig.automation });
+                localConfig = newConfig;
+                appendLog('Loop Control config saved.', 'success');
+
+                // Reset internal timer when time threshold is freshly enabled
+                if (loop_control.time_enabled && !prev_time_enabled) {
+                    try { await api.resetTimer(); } catch(e) {}
+                }
+                updateLcInputsState();
+            } catch (err) {
+                appendLog('Failed to save Loop Control config: ' + err.message, 'error');
+            }
+        }
+
+        function updateLcInputsState(is_running = false) {
+            const infEn = document.getElementById('lc_inf_en').checked;
+            document.getElementById('lc_inf_en').disabled = is_running;
+            document.getElementById('lc_inf_min').disabled = !infEn;
+
+            const timeEn = document.getElementById('lc_time_en').checked;
+            document.getElementById('lc_time_en').disabled = is_running;
+            document.getElementById('lc_time_min').disabled = !timeEn;
+            document.getElementById('lc_time_action').disabled = is_running || !timeEn;
+
+            const refEn = document.getElementById('lc_ref_en').checked;
+            document.getElementById('lc_ref_en').disabled = is_running;
+            document.getElementById('lc_ref_thr').disabled = !refEn;
+            document.getElementById('lc_ref_action').disabled = is_running || !refEn;
+
+            const rstEn = document.getElementById('lc_rst_en').checked;
+            document.getElementById('lc_rst_en').disabled = is_running;
+            document.getElementById('lc_rst_thr').disabled = !rstEn;
+            document.getElementById('lc_rst_action').disabled = is_running || !rstEn;
+        }
+
+        function updateSendButtonsState(is_running = false) {
+            const btnUrlSend = document.getElementById('btnUrlSend');
+            const btnPromptSend = document.getElementById('btnPromptSend');
+            const btnUploadSend = document.getElementById('btnUploadSend');
+            const btnApplySettings = document.getElementById('btnApplySettings');
+            const btnSubmitPrompt = document.getElementById('btnSubmitPrompt');
+            const btnUploadFile = document.getElementById('btnUploadFile');
+
+            if (btnUrlSend) btnUrlSend.disabled = is_running;
+            if (btnPromptSend) btnPromptSend.disabled = is_running;
+            if (btnUploadSend) btnUploadSend.disabled = is_running;
+            if (btnApplySettings) btnApplySettings.disabled = is_running;
+            if (btnSubmitPrompt) btnSubmitPrompt.disabled = is_running;
+            if (btnUploadFile) btnUploadFile.disabled = is_running;
+        }
+
+        async function resetLcTimeTimer() {
+            try {
+                await api.resetTimer();
+                appendLog('Time threshold timer reset.', 'success');
+            } catch(e) {
+                appendLog('Failed to reset timer: ' + e.message, 'error');
+            }
+        }
+
+        // ── Update & Relaunch ─────────────────────────────────────────────────
+        async function checkForUpdates() {
+            try {
+                const result = await window.electronAPI.checkForUpdates();
+                const parts = [];
+                if (result.main)   parts.push(`App ${result.main}`);
+                if (result.engine) parts.push(`Engine ${result.engine}`);
+                const btn   = document.getElementById('btnUpdateRelaunch');
+                const badge = document.getElementById('updateStatusBadge');
+                if (parts.length > 0) {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor  = 'pointer';
+                        btn.textContent   = '⬆ Update & Relaunch (' + parts.join(', ') + ')';
+                    }
+                    if (badge) {
+                        badge.style.display      = 'inline-block';
+                        badge.style.background   = 'rgba(255,204,0,0.15)';
+                        badge.style.borderColor  = 'rgba(255,204,0,0.4)';
+                        badge.style.color        = '#ffcc00';
+                        badge.style.cursor       = 'pointer';
+                        badge.title              = 'Click to update & relaunch';
+                        badge.onclick            = (e) => triggerUpdateAndRelaunch(e);
+                        badge.textContent        = '⬆ ' + parts.join(', ');
+                    }
+                } else {
+                    if (badge) {
+                        badge.style.display      = 'inline-block';
+                        badge.style.background   = 'rgba(0,200,100,0.12)';
+                        badge.style.borderColor  = 'rgba(0,200,100,0.35)';
+                        badge.style.color        = '#4caf87';
+                        badge.style.cursor       = 'default';
+                        badge.title              = '';
+                        badge.onclick            = null;
+                        badge.textContent        = '✓ UP TO DATE';
+                    }
+                }
+            } catch (e) {
+                console.log('checkForUpdates error:', e);
+            }
+        }
+
+        async function triggerUpdateAndRelaunch(event) {
+            if (event) event.preventDefault();
+            const btn = document.getElementById('btnUpdateRelaunch');
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = '⏳ Updating...'; }
+            appendLog('Running git pull...', 'info');
+            try {
+                const res = await window.electronAPI.runUpdate();
+                if (res.log) appendLog(res.log, res.ok ? 'info' : 'error');
+                if (!res.ok) {
+                    appendLog('Git update had errors — aborting relaunch.', 'error');
+                    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '⬆ Update & Relaunch'; }
+                    return;
+                }
+                appendLog('Update complete. Relaunching...', 'success');
+                await window.electronAPI.relaunchApp();
+            } catch (e) {
+                appendLog('Update failed: ' + e.message, 'error');
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '⬆ Update & Relaunch'; }
+            }
+        }
+
+        async function triggerOpenDownloadFolder(event) {
+            if (event) event.preventDefault();
+            try {
+                const config = await api.getConfig();
+                const saveDir = config.save_dir;
+                if (saveDir) {
+                    const result = await window.electronAPI.openFile(saveDir);
+                    if (result) {
+                        alert("Error opening download folder: " + result);
+                    }
+                } else {
+                    alert("Download folder has not been configured in setup yet.");
+                }
+            } catch (err) {
+                alert("Failed to fetch configuration: " + err.message);
+            }
+        }
+
+        function bindLcChangeEvents() {
+            ['lc_inf_en','lc_inf_min',
+             'lc_time_en','lc_time_min','lc_time_action',
+             'lc_ref_en','lc_ref_thr','lc_ref_action',
+             'lc_rst_en','lc_rst_thr','lc_rst_action'
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', saveLoopControlConfig);
+            });
+        }
+
+        // DOM Initializer
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfigFromServer();
+            bindLcChangeEvents();
+            refreshLogs(); // Fetch history immediately on load
+            
+            checkForUpdates();
+            setInterval(() => {
+                updateAccountStatus();
+                updateAutomationStats();
+                refreshLogs();
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

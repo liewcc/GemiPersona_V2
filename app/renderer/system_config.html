@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GemiPersonaPro - System Config</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <a href="setup.html" class="nav-item">
+                ⚙️ Setup
+            </a>
+            <a href="utilities.html" class="nav-item">
+                🛠️ Utilities
+            </a>
+            <a href="account_health.html" class="nav-item">
+                ❤️ Account Health
+            </a>
+            <a href="system_config.html" class="nav-item active">
+                ⚙️ System Config
+            </a>
+            <a href="#" class="nav-item" onclick="openDownloadFolder(event)">
+                📂 Open Download Folder
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="card glass p-20 mb-20">
+                <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px; text-transform: uppercase;">System settings</div>
+                
+                <!-- Toggle 1: Enable Notifications -->
+                <div class="d-flex align-center justify-between" style="align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <p style="font-weight: 500; font-size: 14px; margin-bottom: 5px;">Enable Download Notifications</p>
+                        <p class="text-muted text-small" style="margin: 0;">Show system tray notifications when new images are downloaded during automation or manual runs.</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="notificationToggle" onchange="toggleNotifications()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 2: Notification Sound -->
+                <div class="d-flex align-center justify-between" style="align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);" id="soundToggleRow">
+                    <div>
+                        <p style="font-weight: 500; font-size: 14px; margin-bottom: 5px;">Enable Notification Sound</p>
+                        <p class="text-muted text-small" style="margin: 0;">Play system alert sound when tray notifications are shown.</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="soundToggle" onchange="toggleSound()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 3: Close to System Tray -->
+                <div class="d-flex align-center justify-between" style="align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
+                    <div>
+                        <p style="font-weight: 500; font-size: 14px; margin-bottom: 5px;">Close to System Tray</p>
+                        <p class="text-muted text-small" style="margin: 0;">When enabled, clicking the window close button (X) will minimize the app to the system tray instead of quitting. The taskbar icon will disappear and the app continues running in the background.</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="closeToTrayToggle" onchange="toggleCloseToTray()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Toggle 4: Hide CLI on startup -->
+                <div class="d-flex align-center justify-between" style="align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);" id="hideCliToggleRow">
+                    <div>
+                        <p style="font-weight: 500; font-size: 14px; margin-bottom: 5px;">Hide CLI Window on Startup</p>
+                        <p class="text-muted text-small" style="margin: 0;">When enabled, launching the application will hide the command prompt/terminal window. (Requires starting via run.vbs)</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="hideCliToggle" onchange="toggleHideCli()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Option 4: Notification Click Action -->
+                <div class="d-flex align-center justify-between" style="align-items: center;">
+                    <div>
+                        <p style="font-weight: 500; font-size: 14px; margin-bottom: 5px;">Notification Click Action</p>
+                        <p class="text-muted text-small" style="margin: 0;">Configure the action when clicking the system tray popup notification: open in default viewer or show download folder.</p>
+                    </div>
+                    <div>
+                        <select id="clickActionSelect" class="form-control" style="width: 160px;" onchange="updateClickAction()">
+                            <option value="default_viewer">Default Viewer</option>
+                            <option value="download_folder">Download Folder</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        <!-- Refused Keywords Card -->
+        <div class="card glass p-20 mb-20">
+            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 4px; text-transform: uppercase;">Refusal Detection Keywords</div>
+            <p class="text-muted text-small" style="margin: 0 0 15px;">Phrases used to detect when Gemini refuses a request. The engine checks if any of these strings appear in the response text (case-insensitive). Edit to keep up with Gemini's changing refusal phrasing.</p>
+
+            <div id="refusedKeywordsTable" style="margin-bottom: 12px;">
+                <table style="width:100%; border-collapse: collapse;" id="refusedKwTable">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <th style="text-align:left; padding: 6px 8px; font-size: 12px; color: var(--text-muted); font-weight:500;">Keyword / Phrase</th>
+                            <th style="width: 48px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="refusedKwBody"></tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-secondary btn-sm" onclick="addRefusedKeywordRow()">+ Add</button>
+                <button class="btn btn-primary btn-sm" onclick="saveRefusedKeywords()">Save</button>
+                <span id="refusedKwStatus" style="font-size:12px; color: var(--text-muted);"></span>
+            </div>
+        </div>
+
+        <!-- Quota Full Keywords Card -->
+        <div class="card glass p-20 mb-20">
+            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 4px; text-transform: uppercase;">Quota Full Detection Keywords</div>
+            <p class="text-muted text-small" style="margin: 0 0 15px;">Phrases used to detect when a Gemini account has hit its daily quota. When matched, the engine will attempt to switch to the next profile.</p>
+
+            <div id="quotaKeywordsTable" style="margin-bottom: 12px;">
+                <table style="width:100%; border-collapse: collapse;" id="quotaKwTable">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <th style="text-align:left; padding: 6px 8px; font-size: 12px; color: var(--text-muted); font-weight:500;">Keyword / Phrase</th>
+                            <th style="width: 48px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="quotaKwBody"></tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-secondary btn-sm" onclick="addQuotaKeywordRow()">+ Add</button>
+                <button class="btn btn-primary btn-sm" onclick="saveQuotaKeywords()">Save</button>
+                <span id="quotaKwStatus" style="font-size:12px; color: var(--text-muted);"></span>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        // Load notifications config on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const config = await api.getConfig();
+                const enabled = config.notifications_enabled !== false;
+                document.getElementById('notificationToggle').checked = enabled;
+
+                const soundEnabled = config.notification_sound_enabled !== false;
+                document.getElementById('soundToggle').checked = soundEnabled;
+
+                // Disable sound toggle UI if notifications are disabled
+                document.getElementById('soundToggle').disabled = !enabled;
+                if (!enabled) {
+                    document.getElementById('soundToggleRow').style.opacity = '0.5';
+                }
+
+                // Close to tray toggle (default true)
+                const closeToTray = config.close_to_tray !== false;
+                document.getElementById('closeToTrayToggle').checked = closeToTray;
+
+                // Hide CLI toggle (read from electronAPI)
+                if (window.electronAPI && window.electronAPI.getHideCliFlag) {
+                    const hideCli = await window.electronAPI.getHideCliFlag();
+                    document.getElementById('hideCliToggle').checked = hideCli;
+                } else {
+                    document.getElementById('hideCliToggleRow').style.display = 'none';
+                }
+
+                // Notification Click Action (default download_folder)
+                const clickAction = config.notification_click_action || 'download_folder';
+                document.getElementById('clickActionSelect').value = clickAction;
+            } catch (err) {
+                console.error("Failed to load notifications config:", err);
+            }
+        });
+
+        async function toggleNotifications() {
+            try {
+                const enabled = document.getElementById('notificationToggle').checked;
+                await api.saveConfig({ notifications_enabled: enabled });
+
+                // Enable/disable sound toggle state interactively
+                document.getElementById('soundToggle').disabled = !enabled;
+                document.getElementById('soundToggleRow').style.opacity = enabled ? '1' : '0.5';
+            } catch (err) {
+                alert("Failed to save notification settings: " + err.message);
+            }
+        }
+
+        async function toggleSound() {
+            try {
+                const enabled = document.getElementById('soundToggle').checked;
+                await api.saveConfig({ notification_sound_enabled: enabled });
+            } catch (err) {
+                alert("Failed to save sound settings: " + err.message);
+            }
+        }
+
+        async function toggleCloseToTray() {
+            try {
+                const enabled = document.getElementById('closeToTrayToggle').checked;
+                await api.saveConfig({ close_to_tray: enabled });
+            } catch (err) {
+                alert("Failed to save close-to-tray settings: " + err.message);
+            }
+        }
+
+        async function toggleHideCli() {
+            try {
+                const enabled = document.getElementById('hideCliToggle').checked;
+                if (window.electronAPI && window.electronAPI.setHideCliFlag) {
+                    await window.electronAPI.setHideCliFlag(enabled);
+                }
+            } catch (err) {
+                alert("Failed to save CLI visibility settings: " + err.message);
+            }
+        }
+
+        async function updateClickAction() {
+            try {
+                const action = document.getElementById('clickActionSelect').value;
+                await api.saveConfig({ notification_click_action: action });
+            } catch (err) {
+                alert("Failed to save notification click action settings: " + err.message);
+            }
+        }
+
+        async function openDownloadFolder(event) {
+            if (event) event.preventDefault();
+            try {
+                const config = await api.getConfig();
+                const saveDir = config.save_dir;
+                if (saveDir) {
+                    const result = await window.electronAPI.openFile(saveDir);
+                    if (result) {
+                        alert("Error opening download folder: " + result);
+                    }
+                } else {
+                    alert("Download folder has not been configured in setup yet.");
+                }
+            } catch (err) {
+                alert("Failed to fetch configuration: " + err.message);
+            }
+        }
+
+        // ── Keyword Table Helpers ────────────────────────────────────────────
+
+        function makeKeywordRow(value, onDelete) {
+            const tr = document.createElement('tr');
+            tr.style.cssText = 'border-bottom: 1px solid var(--border);';
+
+            const tdInput = document.createElement('td');
+            tdInput.style.cssText = 'padding: 4px 8px;';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = value;
+            input.className = 'form-control';
+            input.style.cssText = 'width:100%; font-size:13px; padding: 4px 8px; height: 30px;';
+            tdInput.appendChild(input);
+
+            const tdDel = document.createElement('td');
+            tdDel.style.cssText = 'padding: 4px 8px; text-align:center;';
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '✕';
+            delBtn.title = 'Remove';
+            delBtn.style.cssText = 'background:none; border:none; color:#ff6b6b; cursor:pointer; font-size:14px; padding:2px 6px;';
+            delBtn.onclick = () => { tr.remove(); onDelete && onDelete(); };
+            tdDel.appendChild(delBtn);
+
+            tr.appendChild(tdInput);
+            tr.appendChild(tdDel);
+            return tr;
+        }
+
+        function collectKeywords(tbodyId) {
+            return Array.from(document.querySelectorAll(`#${tbodyId} input[type="text"]`))
+                .map(i => i.value.trim())
+                .filter(v => v.length > 0);
+        }
+
+        function showStatus(spanId, msg, isError = false) {
+            const el = document.getElementById(spanId);
+            el.textContent = msg;
+            el.style.color = isError ? '#ff6b6b' : '#6bffb8';
+            setTimeout(() => { el.textContent = ''; }, 3000);
+        }
+
+        // ── Refused Keywords ─────────────────────────────────────────────────
+
+        async function loadRefusedKeywords() {
+            try {
+                const data = await api.getRefusedKeywords();
+                const tbody = document.getElementById('refusedKwBody');
+                tbody.innerHTML = '';
+                (data.keywords || []).forEach(kw => {
+                    tbody.appendChild(makeKeywordRow(kw));
+                });
+            } catch (err) {
+                showStatus('refusedKwStatus', 'Load failed: ' + err.message, true);
+            }
+        }
+
+        function addRefusedKeywordRow() {
+            const tbody = document.getElementById('refusedKwBody');
+            const row = makeKeywordRow('');
+            tbody.appendChild(row);
+            row.querySelector('input').focus();
+        }
+
+        async function saveRefusedKeywords() {
+            try {
+                const keywords = collectKeywords('refusedKwBody');
+                await api.saveRefusedKeywords(keywords);
+                showStatus('refusedKwStatus', `Saved ${keywords.length} keywords.`);
+            } catch (err) {
+                showStatus('refusedKwStatus', 'Save failed: ' + err.message, true);
+            }
+        }
+
+        // ── Quota Keywords ───────────────────────────────────────────────────
+
+        async function loadQuotaKeywords() {
+            try {
+                const data = await api.getQuotaKeywords();
+                const tbody = document.getElementById('quotaKwBody');
+                tbody.innerHTML = '';
+                (data.keywords || []).forEach(kw => {
+                    tbody.appendChild(makeKeywordRow(kw));
+                });
+            } catch (err) {
+                showStatus('quotaKwStatus', 'Load failed: ' + err.message, true);
+            }
+        }
+
+        function addQuotaKeywordRow() {
+            const tbody = document.getElementById('quotaKwBody');
+            const row = makeKeywordRow('');
+            tbody.appendChild(row);
+            row.querySelector('input').focus();
+        }
+
+        async function saveQuotaKeywords() {
+            try {
+                const keywords = collectKeywords('quotaKwBody');
+                await api.saveQuotaKeywords(keywords);
+                showStatus('quotaKwStatus', `Saved ${keywords.length} keywords.`);
+            } catch (err) {
+                showStatus('quotaKwStatus', 'Save failed: ' + err.message, true);
+            }
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRefusedKeywords();
+            loadQuotaKeywords();
+        });
+    </script>
+</body>
+</html>
