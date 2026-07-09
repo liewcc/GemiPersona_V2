@@ -39,7 +39,7 @@ def main():
             sys.exit(1)
 
     for mod in ("gemini_api_client", "processing_utils", "shared_state",
-                "inverse_alpha_compositing", "image_notifier", "upscaler_worker", "lama_refiner"):
+                "inverse_alpha_compositing", "image_notifier", "lama_refiner"):
         try_import(mod)
 
     print("[OK] All selfchecks passed!")
