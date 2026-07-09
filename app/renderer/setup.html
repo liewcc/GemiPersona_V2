@@ -1165,7 +1165,12 @@
                     const currentVal = select.value;
                     select.innerHTML = '<option value="">Select Target Profile...</option>';
                     res.profiles.forEach(p => {
-                        select.innerHTML += `<option value="${p}" ${p === currentVal ? 'selected' : ''}>${p}</option>`;
+                        // V2 /engine/profiles returns objects {dir, email, name}; use email
+                        // as the switch_account identifier (matches Gemi_MCP_V2's active_user=email).
+                        const email = (typeof p === 'string') ? p : (p.email || p.name || p.dir || '');
+                        if (!email) return;
+                        const label = (typeof p === 'string') ? p : (p.name ? `${p.name} — ${p.email}` : p.email);
+                        select.innerHTML += `<option value="${email}" ${email === currentVal ? 'selected' : ''}>${label}</option>`;
                     });
                 }
             } catch(e) {
