@@ -22,3 +22,6 @@ engine_svc.out
 conductor/conductor.log
 conductor/__pycache__/
 HANDOFF.md
+
+# Runtime state written by main.js hide-cli IPC handlers
+/data/

@@ -383,10 +383,15 @@ async def account_switch_ep(req: AccountSwitchRequest):
         junction_target = None
         try:
             junction_target = os.readlink(
-                os.path.join(BASE_DIR, "browser_session_sandbox", "Default")
+                os.path.join(ENGINE_DIR, "browser_session_sandbox", "Default")
             )
         except Exception:
-            pass
+            try:
+                junction_target = os.readlink(
+                    os.path.join(BASE_DIR, "browser_session_sandbox", "Default")
+                )
+            except Exception:
+                pass
 
         return {
             "ok": True,
@@ -397,6 +402,26 @@ async def account_switch_ep(req: AccountSwitchRequest):
     except Exception as e:
         logger.error(f"Account switch failed: {e}")
         return JSONResponse(status_code=502, content={"ok": False, "detail": str(e)})
+
+@app.get("/engine/profiles")
+async def get_engine_profiles_ep():
+    """Fetch profiles from the engine and filter out ghost entries whose
+    browser_user_data directory does not actually exist on disk."""
+    await ensure_service()
+    base = get_engine_url()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{base}/engine/profiles")
+            data = resp.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch engine profiles: {e}")
+        return JSONResponse(status_code=502, content={"error": "Bad Gateway"})
+    user_data_root = os.path.join(ENGINE_DIR, "browser_user_data")
+    profiles = [
+        p for p in data.get("profiles", [])
+        if p.get("dir") and os.path.isdir(os.path.join(user_data_root, p["dir"]))
+    ]
+    return {"profiles": profiles}
 
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
