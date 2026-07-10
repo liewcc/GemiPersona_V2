@@ -961,14 +961,7 @@
             const headless = document.getElementById('headlessToggle')?.checked ?? true;
             try {
                 if (action === 'Start Browser') {
-                    // Guard: check if upscaler is running
-                    try {
-                        const upscalerStatus = await api.getUpscalerStatus();
-                        if (upscalerStatus && upscalerStatus.running) {
-                            alert('⚠️ 4K Upscaler is currently running.\nPlease stop the upscaler on the Utilities page before starting the browser.');
-                            return;
-                        }
-                    } catch (e) {}
+                    // (4K Upscaler removed in V2 — no upscaler-running guard needed)
 
                     // Guard: close any lingering registration browser before starting the main one
                     try {
@@ -1027,12 +1020,7 @@
                     isServiceRunning = false;
                 }
                 
-                try {
-                    const upscalerStatus = await api.getUpscalerStatus();
-                    isUpscalerRunning = !!(upscalerStatus && upscalerStatus.running);
-                } catch (err) {
-                    console.error("Failed to get upscaler status:", err);
-                }
+                // (4K Upscaler removed in V2 — isUpscalerRunning stays false)
             }
 
             const isBrowserOnline = isBrowserRunning || isUpscalerRunning;
