@@ -248,10 +248,10 @@ async def image_metadata_ep(path: str):
 
 @app.post("/engine/switch_to_profile")
 async def switch_to_profile_ep(username: str):
-    url = get_engine_url() + "/engine/switch_account"
+    base = get_engine_url()
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(url, json={"username": username})
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            resp = await _switch_account_headed(client, base, username)
         return Response(content=resp.content, status_code=resp.status_code,
                         media_type=resp.headers.get("content-type"))
     except Exception as e:
@@ -331,6 +331,24 @@ async def attach_files_ep(file_paths: list = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=502, content={"detail": str(e)})
 
+def _load_app_config():
+    try:
+        with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+async def _switch_account_headed(client, base, username):
+    """Switch to `username`'s profile HEADED. The engine's /engine/switch_account
+    forces headless=True (Google then shows logged-out UI), so instead orchestrate
+    stop + start with the configured headless (config.json, default False)."""
+    cfg = _load_app_config()
+    payload = {"headless": bool(cfg.get("headless", False)), "active_user": username}
+    if cfg.get("active_service"):
+        payload["active_service"] = cfg["active_service"]
+    await client.post(base + "/engine/stop")
+    return await client.post(base + "/engine/start", json=payload)
+
 async def _rotate_profile(direction: int):
     """Switch to the next (direction=+1) or previous (-1) Chrome profile.
     Order comes from the engine's /engine/profiles; current profile is matched by
@@ -368,7 +386,7 @@ async def _rotate_profile(direction: int):
             target = profiles[0] if idx == -1 else profiles[(idx + direction) % n]
             target_email = target.get("email")
 
-            sr = await client.post(base + "/engine/switch_account", json={"username": target_email})
+            sr = await _switch_account_headed(client, base, target_email)
         return Response(content=sr.content, status_code=sr.status_code,
                         media_type=sr.headers.get("content-type"))
     except Exception as e:
