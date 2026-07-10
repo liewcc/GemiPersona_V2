@@ -350,15 +350,12 @@ async def _switch_account_headed(client, base, username):
     return await client.post(base + "/engine/start", json=payload)
 
 async def _rotate_profile(direction: int):
-    """Switch to the next (direction=+1) or previous (-1) Chrome profile.
-    Order comes from the engine's /engine/profiles; current profile is matched by
-    email against /browser/account's account_id. Falls back to the first profile
-    when the current one can't be determined."""
+    """Switch to the next (+1) or previous (-1) Chrome profile.
+    Order comes from /engine/profiles; the CURRENT profile is taken from the engine
+    health's active_profile (the profile dir) — reliable and with no DOM wait, unlike
+    /browser/account whose account_id is DOM-derived and often empty/'Unknown Account'
+    (which broke rotation). Falls back to the first profile when current is unknown."""
     base = get_engine_url()
-
-    def _norm(v):
-        return (v or "").split("@")[0].lower().strip()
-
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             pr = await client.get(base + "/engine/profiles")
@@ -366,27 +363,24 @@ async def _rotate_profile(direction: int):
             if not profiles:
                 return JSONResponse(status_code=400, content={"detail": "No profiles found"})
 
-            current_email = None
+            current_dir = None
             try:
-                ar = await client.get(base + "/browser/account")
-                if ar.status_code == 200:
-                    current_email = (ar.json() or {}).get("account_id")
+                hr = await client.get(base + "/health")
+                if hr.status_code == 200:
+                    current_dir = (hr.json() or {}).get("active_profile")
             except Exception:
                 pass
 
             idx = -1
-            if current_email:
-                nc = _norm(current_email)
+            if current_dir:
                 for i, p in enumerate(profiles):
-                    if _norm(p.get("email")) == nc:
+                    if p.get("dir") == current_dir:
                         idx = i
                         break
 
             n = len(profiles)
             target = profiles[0] if idx == -1 else profiles[(idx + direction) % n]
-            target_email = target.get("email")
-
-            sr = await _switch_account_headed(client, base, target_email)
+            sr = await _switch_account_headed(client, base, target.get("email"))
         return Response(content=sr.content, status_code=sr.status_code,
                         media_type=sr.headers.get("content-type"))
     except Exception as e:
