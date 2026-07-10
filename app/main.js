@@ -505,7 +505,7 @@ ipcMain.handle('check-for-updates', async () => {
 
   function fetchJson(url) {
     return new Promise((resolve) => {
-      https.get(url, { headers: { 'User-Agent': 'GemiPersonaPro_DT' } }, (res) => {
+      https.get(url, { headers: { 'User-Agent': 'GemiPersona_V2' } }, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
@@ -529,12 +529,12 @@ ipcMain.handle('check-for-updates', async () => {
 
   try {
     const [remoteApp, remoteEngine] = await Promise.all([
-      fetchJson('https://raw.githubusercontent.com/liewcc/GemiPersonaPro_DT/main/version.json'),
-      fetchJson('https://raw.githubusercontent.com/liewcc/Gemi_Engine/master/version.json'),
+      fetchJson('https://raw.githubusercontent.com/liewcc/GemiPersona_V2/master/version.json'),
+      fetchJson('https://raw.githubusercontent.com/liewcc/Gemi_Engine_V2/master/version.json'),
     ]);
 
     const localApp    = readLocalVer(path.join(root, 'version.json'));
-    const localEngine = readLocalVer(path.join(root, 'engine', 'version.json'));
+    const localEngine = readLocalVer(path.join(root, 'Gemi_Engine_V2', 'version.json'));
 
     return {
       main:   verLabel(localApp,    remoteApp?.version    || '0.0.0'),
@@ -548,10 +548,25 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('run-update', async () => {
   const root = path.join(__dirname, '..');
   const r1 = await gitExec(['pull'], root);
-  const r2 = await gitExec(['submodule', 'update', '--remote', 'engine'], root);
+  const r2 = await gitExec(['submodule', 'update', '--remote', 'Gemi_Engine_V2'], root);
   return {
     ok: r1.ok && r2.ok,
     log: [r1.stdout, r1.stderr, r2.stdout, r2.stderr].filter(Boolean).join('\n')
+  };
+});
+
+// Returns { ui, engine } version strings from both local version.json files
+ipcMain.handle('get-versions', () => {
+  const fs   = require('fs');
+  const root = path.join(__dirname, '..');
+
+  function readLocalVer(filePath) {
+    try { return JSON.parse(fs.readFileSync(filePath, 'utf8')).version || '?.?.?'; } catch { return '?.?.?'; }
+  }
+
+  return {
+    ui:     readLocalVer(path.join(root, 'version.json')),
+    engine: readLocalVer(path.join(root, 'Gemi_Engine_V2', 'version.json')),
   };
 });
 

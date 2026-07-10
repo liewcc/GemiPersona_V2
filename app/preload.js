@@ -30,5 +30,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeLoginLookup: (data) => ipcRenderer.invoke('write-login-lookup', data),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   runUpdate: () => ipcRenderer.invoke('run-update'),
-  relaunchApp: () => ipcRenderer.invoke('relaunch-app')
+  relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
+  getVersions: () => ipcRenderer.invoke('get-versions')
 });

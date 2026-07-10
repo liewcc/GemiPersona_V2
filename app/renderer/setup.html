@@ -138,6 +138,11 @@
             <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
                 📂 Open Download Folder
             </a>
+            <!-- Version display -->
+            <div style="margin-top:auto; padding:12px 24px 0; font-size:11px; color:var(--text-muted, #888); line-height:1.6;">
+                <div>UI <span id="uiVersionText">?.?.?</span></div>
+                <div>Engine <span id="engineVersionText">?.?.?</span></div>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -156,7 +161,6 @@
                     <!-- Automation Stats -->
                     <div class="d-flex align-center justify-between glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; white-space: nowrap; overflow: hidden;">
                         <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span><span id="newImagesBadge" class="new-images-badge" style="display: none;" title="Click to clear" onclick="resetNewImagesBadge()">+0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
-                        <span id="updateStatusBadge" style="display:none; margin-left:16px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(255,204,0,0.15); border:1px solid rgba(255,204,0,0.4); color:#ffcc00; white-space:nowrap; flex-shrink:0;"></span>
                     </div>
                 </div>
                 <!-- Row 2: Action Controls -->
@@ -2720,8 +2724,7 @@
                 const parts = [];
                 if (result.main)   parts.push(`App ${result.main}`);
                 if (result.engine) parts.push(`Engine ${result.engine}`);
-                const btn   = document.getElementById('btnUpdateRelaunch');
-                const badge = document.getElementById('updateStatusBadge');
+                const btn = document.getElementById('btnUpdateRelaunch');
                 if (parts.length > 0) {
                     if (btn) {
                         btn.disabled = false;
@@ -2729,31 +2732,21 @@
                         btn.style.cursor  = 'pointer';
                         btn.textContent   = '⬆ Update & Relaunch (' + parts.join(', ') + ')';
                     }
-                    if (badge) {
-                        badge.style.display      = 'inline-block';
-                        badge.style.background   = 'rgba(255,204,0,0.15)';
-                        badge.style.borderColor  = 'rgba(255,204,0,0.4)';
-                        badge.style.color        = '#ffcc00';
-                        badge.style.cursor       = 'pointer';
-                        badge.title              = 'Click to update & relaunch';
-                        badge.onclick            = (e) => triggerUpdateAndRelaunch(e);
-                        badge.textContent        = '⬆ ' + parts.join(', ');
-                    }
-                } else {
-                    if (badge) {
-                        badge.style.display      = 'inline-block';
-                        badge.style.background   = 'rgba(0,200,100,0.12)';
-                        badge.style.borderColor  = 'rgba(0,200,100,0.35)';
-                        badge.style.color        = '#4caf87';
-                        badge.style.cursor       = 'default';
-                        badge.title              = '';
-                        badge.onclick            = null;
-                        badge.textContent        = '✓ UP TO DATE';
-                    }
                 }
             } catch (e) {
                 console.log('checkForUpdates error:', e);
             }
+        }
+
+        // Fetches local UI and engine version numbers and fills the sidebar display
+        async function loadVersions() {
+            try {
+                const versions = await window.electronAPI.getVersions();
+                const uiEl  = document.getElementById('uiVersionText');
+                const engEl = document.getElementById('engineVersionText');
+                if (uiEl  && versions.ui)     uiEl.textContent  = 'v' + versions.ui;
+                if (engEl && versions.engine) engEl.textContent = 'v' + versions.engine;
+            } catch (_) { /* silent on failure */ }
         }
 
         async function triggerUpdateAndRelaunch(event) {
@@ -2813,6 +2806,7 @@
             refreshLogs(); // Fetch history immediately on load
             
             checkForUpdates();
+            loadVersions();
             setInterval(() => {
                 updateAccountStatus();
                 updateAutomationStats();
