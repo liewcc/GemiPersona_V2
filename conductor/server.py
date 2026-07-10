@@ -251,7 +251,13 @@ async def switch_to_profile_ep(username: str):
     base = get_engine_url()
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
-            resp = await _switch_account_headed(client, base, username)
+            pr = await client.get(base + "/engine/profiles")
+            profiles = pr.json().get("profiles", []) if pr.status_code == 200 else []
+            target = next((p for p in profiles
+                           if (p.get("email") or "").lower() == username.lower()), None)
+            email = target.get("email") if target else username
+            profile_dir = target.get("dir") if target else None
+            resp = await _switch_account_headed(client, base, email, profile_dir)
         return Response(content=resp.content, status_code=resp.status_code,
                         media_type=resp.headers.get("content-type"))
     except Exception as e:
@@ -338,15 +344,53 @@ def _load_app_config():
     except Exception:
         return {}
 
-async def _switch_account_headed(client, base, username):
-    """Switch to `username`'s profile HEADED. The engine's /engine/switch_account
-    forces headless=True (Google then shows logged-out UI), so instead orchestrate
-    stop + start with the configured headless (config.json, default False)."""
+def _clear_chrome_locks():
+    """Mirror Gemi_MCP_V2 clearChromeLocks: kill Playwright's Chromium so the
+    sandbox junction can be recreated (releases file locks)."""
+    try:
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
+             "Where-Object { $_.Path -like '*ms-playwright*' } | "
+             "Stop-Process -Force -ErrorAction SilentlyContinue"],
+            timeout=15, capture_output=True)
+    except Exception:
+        pass
+
+def _remove_sandbox_default():
+    """Remove browser_session_sandbox/Default JUNCTION (root + engine dirs) so
+    start() can recreate the mklink to the target profile. Uses os.rmdir, which
+    removes the junction LINK only — never recurses into / deletes the real profile."""
+    for _base in (BASE_DIR, ENGINE_DIR):
+        d = os.path.join(_base, "browser_session_sandbox", "Default")
+        try:
+            if os.path.exists(d):
+                os.rmdir(d)
+        except Exception:
+            pass
+
+async def _switch_account_headed(client, base, email, profile_dir=None):
+    """Port of Gemi_MCP_V2 doSwitchAccount (the proven switch sequence): stop,
+    persist config, clear Chromium locks, drop the old sandbox Default junction,
+    wait, then start HEADED into the target profile (headless from config, default False)."""
     cfg = _load_app_config()
-    payload = {"headless": bool(cfg.get("headless", False)), "active_user": username}
-    if cfg.get("active_service"):
-        payload["active_service"] = cfg["active_service"]
+    headless = bool(cfg.get("headless", False))
+    active_service = cfg.get("active_service")
+    # 1. stop current browser
     await client.post(base + "/engine/stop")
+    # 2. persist chosen profile + user to config.json (this is what the card reads)
+    await client.post(base + "/engine/config",
+                      json={"active_profile": profile_dir, "active_user": email})
+    # 3. release Playwright Chromium file locks
+    _clear_chrome_locks()
+    # 4. drop the stale sandbox Default junction
+    _remove_sandbox_default()
+    # 5. let FS / handles settle
+    await asyncio.sleep(1)
+    # 6. start HEADED into the target profile
+    payload = {"headless": headless, "active_user": email}
+    if active_service:
+        payload["active_service"] = active_service
     return await client.post(base + "/engine/start", json=payload)
 
 async def _rotate_profile(direction: int):
@@ -380,7 +424,7 @@ async def _rotate_profile(direction: int):
 
             n = len(profiles)
             target = profiles[0] if idx == -1 else profiles[(idx + direction) % n]
-            sr = await _switch_account_headed(client, base, target.get("email"))
+            sr = await _switch_account_headed(client, base, target.get("email"), target.get("dir"))
         return Response(content=sr.content, status_code=sr.status_code,
                         media_type=sr.headers.get("content-type"))
     except Exception as e:
