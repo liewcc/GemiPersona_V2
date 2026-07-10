@@ -55,22 +55,12 @@ const api = {
         return this.request('/engine/stop_registration', 'POST');
     },
 
-    // Profile Management
-    switchProfile() {
-        return this.request('/engine/switch_profile', 'POST');
-    },
-
-    switchProfilePrevious() {
-        return this.request('/engine/switch_profile_previous', 'POST');
-    },
-
-    switchToProfile(username) {
-        return this.request(`/engine/switch_to_profile?username=${encodeURIComponent(username)}`, 'POST');
-    },
-
-    reLoginCurrentProfile(h = null) {
-        const query = h !== null ? `?h=${h}` : '';
-        return this.request(`/engine/re_login_current_profile${query}`, 'POST');
+    // Account switching (single endpoint, 6-step sequence)
+    accountSwitch(username, profileDir = null) {
+        return this.request('/account/switch', 'POST', {
+            username,
+            profile_dir: profileDir,
+        });
     },
 
 

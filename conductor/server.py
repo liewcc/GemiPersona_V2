@@ -246,34 +246,6 @@ async def image_metadata_ep(path: str):
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-@app.post("/engine/switch_to_profile")
-async def switch_to_profile_ep(username: str):
-    base = get_engine_url()
-    try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            pr = await client.get(base + "/engine/profiles")
-            profiles = pr.json().get("profiles", []) if pr.status_code == 200 else []
-            target = next((p for p in profiles
-                           if (p.get("email") or "").lower() == username.lower()), None)
-            email = target.get("email") if target else username
-            profile_dir = target.get("dir") if target else None
-            resp = await _switch_account_headed(client, base, email, profile_dir)
-        return Response(content=resp.content, status_code=resp.status_code,
-                        media_type=resp.headers.get("content-type"))
-    except Exception as e:
-        return JSONResponse(status_code=502, content={"detail": str(e)})
-
-@app.post("/engine/re_login_current_profile")
-async def re_login_current_profile_ep():
-    url = get_engine_url() + "/engine/re_login"
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(url)
-        return Response(content=resp.content, status_code=resp.status_code,
-                        media_type=resp.headers.get("content-type"))
-    except Exception as e:
-        return JSONResponse(status_code=502, content={"detail": str(e)})
-
 @app.post("/engine/profiles/save")
 async def profiles_save_ep(data: dict = Body(...)):
     # Vestigial in V2 (profiles derive from Local State); persist the UI's list anyway.
@@ -337,106 +309,94 @@ async def attach_files_ep(file_paths: list = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=502, content={"detail": str(e)})
 
-def _load_app_config():
-    try:
-        with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+# ── Account switching (single endpoint, 6-step sequence from Gemi_MCP_V2) ────
 
-def _clear_chrome_locks():
-    """Mirror Gemi_MCP_V2 clearChromeLocks: kill Playwright's Chromium so the
-    sandbox junction can be recreated (releases file locks)."""
-    try:
-        subprocess.run(
-            ["powershell", "-NoProfile", "-Command",
-             "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
-             "Where-Object { $_.Path -like '*ms-playwright*' } | "
-             "Stop-Process -Force -ErrorAction SilentlyContinue"],
-            timeout=15, capture_output=True)
-    except Exception:
-        pass
+class AccountSwitchRequest(BaseModel):
+    username: str
+    profile_dir: str | None = None
 
-def _remove_sandbox_default():
-    """Remove browser_session_sandbox/Default JUNCTION (root + engine dirs) so
-    start() can recreate the mklink to the target profile. Uses os.rmdir, which
-    removes the junction LINK only — never recurses into / deletes the real profile."""
-    for _base in (BASE_DIR, ENGINE_DIR):
-        d = os.path.join(_base, "browser_session_sandbox", "Default")
-        try:
-            if os.path.exists(d):
-                os.rmdir(d)
-        except Exception:
-            pass
-
-async def _switch_account_headed(client, base, email, profile_dir=None):
-    """Port of Gemi_MCP_V2 doSwitchAccount (the proven switch sequence): stop,
-    persist config, clear Chromium locks, drop the old sandbox Default junction,
-    wait, then start HEADED into the target profile (headless from config, default False)."""
-    cfg = _load_app_config()
-    headless = bool(cfg.get("headless", False))
-    active_service = cfg.get("active_service")
-    # 1. stop current browser
-    await client.post(base + "/engine/stop")
-    # 2. persist chosen profile + user to config.json (this is what the card reads)
-    await client.post(base + "/engine/config",
-                      json={"active_profile": profile_dir, "active_user": email})
-    # 3. release Playwright Chromium file locks
-    _clear_chrome_locks()
-    # 4. drop the stale sandbox Default junction
-    _remove_sandbox_default()
-    # 5. let FS / handles settle
-    await asyncio.sleep(1)
-    # 6. start HEADED into the target profile
-    payload = {"headless": headless, "active_user": email}
-    if active_service:
-        payload["active_service"] = active_service
-    return await client.post(base + "/engine/start", json=payload)
-
-async def _rotate_profile(direction: int):
-    """Switch to the next (+1) or previous (-1) Chrome profile.
-    Order comes from /engine/profiles; the CURRENT profile is taken from the engine
-    health's active_profile (the profile dir) — reliable and with no DOM wait, unlike
-    /browser/account whose account_id is DOM-derived and often empty/'Unknown Account'
-    (which broke rotation). Falls back to the first profile when current is unknown."""
+@app.post("/account/switch")
+async def account_switch_ep(req: AccountSwitchRequest):
+    """Switch the active Chrome profile. Implements the proven 6-step sequence
+    from Gemi_MCP_V2 doSwitchAccount: stop → config → kill Chromium → remove
+    sandbox junctions → sleep → start."""
+    await ensure_service()
     base = get_engine_url()
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
-            pr = await client.get(base + "/engine/profiles")
-            profiles = pr.json().get("profiles", []) if pr.status_code == 200 else []
-            if not profiles:
-                return JSONResponse(status_code=400, content={"detail": "No profiles found"})
-
-            current_dir = None
+            # 1. Stop current browser (ignore failure if already stopped)
             try:
-                hr = await client.get(base + "/health")
-                if hr.status_code == 200:
-                    current_dir = (hr.json() or {}).get("active_profile")
+                await client.post(f"{base}/engine/stop")
             except Exception:
                 pass
 
-            idx = -1
-            if current_dir:
-                for i, p in enumerate(profiles):
-                    if p.get("dir") == current_dir:
-                        idx = i
-                        break
+            # 2. Persist chosen profile + user to engine config
+            await client.post(
+                f"{base}/engine/config",
+                json={"active_profile": req.profile_dir, "active_user": req.username},
+            )
 
-            n = len(profiles)
-            target = profiles[0] if idx == -1 else profiles[(idx + direction) % n]
-            sr = await _switch_account_headed(client, base, target.get("email"), target.get("dir"))
-        return Response(content=sr.content, status_code=sr.status_code,
-                        media_type=sr.headers.get("content-type"))
+            # 3. Kill Playwright Chromium to release file locks
+            try:
+                subprocess.run(
+                    [
+                        "powershell", "-NoProfile", "-Command",
+                        "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
+                        "Where-Object { $_.Path -like '*ms-playwright*' } | "
+                        "Stop-Process -Force -ErrorAction SilentlyContinue",
+                    ],
+                    timeout=15,
+                    capture_output=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except Exception:
+                pass
+
+            # 4. Remove BOTH sandbox junctions (os.rmdir only — NTFS junction safe)
+            for sandbox_root in (BASE_DIR, ENGINE_DIR):
+                junction = os.path.join(sandbox_root, "browser_session_sandbox", "Default")
+                try:
+                    if os.path.exists(junction):
+                        os.rmdir(junction)
+                except Exception:
+                    pass
+
+            # 5. Let FS handles settle
+            await asyncio.sleep(1)
+
+            # 6. Read config.json and start browser into the target profile
+            cfg = {}
+            try:
+                with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
+                    cfg = json.load(f)
+            except Exception:
+                pass
+            headless = bool(cfg.get("headless", False))
+            active_service = cfg.get("active_service")
+            start_payload = {"headless": headless, "active_user": req.username}
+            if active_service:
+                start_payload["active_service"] = active_service
+            start_resp = await client.post(f"{base}/engine/start", json=start_payload)
+            engine_start = start_resp.json() if start_resp.status_code == 200 else {"error": start_resp.text}
+
+        # Diagnostic: resolve what the sandbox junction points to after restart
+        junction_target = None
+        try:
+            junction_target = os.readlink(
+                os.path.join(BASE_DIR, "browser_session_sandbox", "Default")
+            )
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "active_user": req.username,
+            "engine_start": engine_start,
+            "junction_target": junction_target,
+        }
     except Exception as e:
-        return JSONResponse(status_code=502, content={"detail": str(e)})
-
-@app.post("/engine/switch_profile")
-async def switch_profile_ep(h: bool = None):
-    return await _rotate_profile(1)
-
-@app.post("/engine/switch_profile_previous")
-async def switch_profile_previous_ep(h: bool = None):
-    return await _rotate_profile(-1)
+        logger.error(f"Account switch failed: {e}")
+        return JSONResponse(status_code=502, content={"ok": False, "detail": str(e)})
 
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])

@@ -968,7 +968,9 @@
                         await api.stopRegistrationMode();
                     } catch (e) {}
                     appendLog(`Starting browser (headless=${headless})...`, 'info');
-                    await api.startEngine({ headless });
+                    // Start into the persisted active profile (like Gemi_MCP_V2), not Chrome's default.
+                    const _cfg = await api.getConfig().catch(() => ({}));
+                    await api.startEngine({ headless, active_user: _cfg.active_user || null, active_service: _cfg.active_service || null });
                     appendLog('Browser started.', 'success');
                 } else {
                     // Set flag BEFORE the async stop so any concurrent poll
@@ -1151,14 +1153,18 @@
                 const select = document.getElementById('targetProfileSelect');
                 if (res.profiles) {
                     const currentVal = select.value;
-                    select.innerHTML = '<option value="">Select Target Profile...</option>';
+                    select.innerHTML = '<option value="" data-dir="">Select Target Profile...</option>';
                     res.profiles.forEach(p => {
-                        // V2 /engine/profiles returns objects {dir, email, name}; use email
-                        // as the switch_account identifier (matches Gemi_MCP_V2's active_user=email).
                         const email = (typeof p === 'string') ? p : (p.email || p.name || p.dir || '');
-                        if (!email) return;
-                        const label = (typeof p === 'string') ? p : (p.name ? `${p.name} — ${p.email}` : p.email);
-                        select.innerHTML += `<option value="${email}" ${email === currentVal ? 'selected' : ''}>${label}</option>`;
+                        const dir = (typeof p === 'string') ? '' : (p.dir || '');
+                        if (!email && !dir) return;
+                        const label = (typeof p === 'string') ? p : (p.name ? `${p.name} — ${p.email}` : p.email || p.dir);
+                        const opt = document.createElement('option');
+                        opt.value = email;
+                        opt.dataset.dir = dir;
+                        opt.textContent = label;
+                        if (email === currentVal) opt.selected = true;
+                        select.appendChild(opt);
                     });
                 }
             } catch(e) {
@@ -1166,55 +1172,96 @@
             }
         }
 
+        // Helper: disable a set of account-action buttons during an async operation
+        function _setAccountButtonsDisabled(disabled) {
+            const ids = ['btnReLogin'];
+            const selectors = [
+                'button[onclick="switchProfilePrev()"]',
+                'button[onclick="switchProfileNext()"]',
+                'button[onclick="switchToTargetProfile()"]',
+            ];
+            ids.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = disabled; });
+            selectors.forEach(s => { const b = document.querySelector(s); if (b) b.disabled = disabled; });
+        }
+
         async function switchToTargetProfile() {
-            const username = document.getElementById('targetProfileSelect').value;
-            if (!username) return;
+            const select = document.getElementById('targetProfileSelect');
+            const opt = select.options[select.selectedIndex];
+            if (!opt || !opt.value) return;
+            const email = opt.value;
+            const dir = opt.dataset.dir || null;
+            _setAccountButtonsDisabled(true);
             try {
-                appendLog(`Switching to profile: ${username}...`, 'info');
-                const res = await api.switchToProfile(username);
-                appendLog(`Profile switch status: ${res.message}`, 'success');
+                appendLog(`Switching to profile: ${email}...`, 'info');
+                const res = await api.accountSwitch(email, dir);
+                appendLog(`Switched to ${res.active_user || email}`, 'success');
                 setTimeout(updateAccountStatus, 1500);
             } catch (err) {
                 appendLog('Switch failed: ' + err.message, 'error');
+            } finally {
+                _setAccountButtonsDisabled(false);
             }
         }
 
         async function switchProfileNext() {
+            _setAccountButtonsDisabled(true);
             try {
-                appendLog('Switching to next profile...', 'info');
-                const res = await api.switchProfile();
-                appendLog(`Profile switch status: ${res.message}`, 'success');
+                const profiles = (await api.getProfiles()).profiles || [];
+                if (!profiles.length) { appendLog('No profiles available.', 'error'); return; }
+                const cfg = await api.getConfig();
+                let idx = profiles.findIndex(p => p.dir === cfg.active_profile);
+                if (idx < 0) idx = profiles.findIndex(p => p.email === cfg.active_user);
+                if (idx < 0) idx = 0;
+                const target = profiles[(idx + 1) % profiles.length];
+                const email = target.email || target.dir;
+                appendLog(`Switching to next profile: ${email}...`, 'info');
+                const res = await api.accountSwitch(email, target.dir);
+                appendLog(`Switched to ${res.active_user || email}`, 'success');
                 setTimeout(updateAccountStatus, 1500);
             } catch (err) {
                 appendLog('Switch failed: ' + err.message, 'error');
+            } finally {
+                _setAccountButtonsDisabled(false);
             }
         }
 
         async function switchProfilePrev() {
+            _setAccountButtonsDisabled(true);
             try {
-                appendLog('Switching to previous profile...', 'info');
-                const res = await api.switchProfilePrevious();
-                appendLog(`Profile switch status: ${res.message}`, 'success');
+                const profiles = (await api.getProfiles()).profiles || [];
+                if (!profiles.length) { appendLog('No profiles available.', 'error'); return; }
+                const cfg = await api.getConfig();
+                let idx = profiles.findIndex(p => p.dir === cfg.active_profile);
+                if (idx < 0) idx = profiles.findIndex(p => p.email === cfg.active_user);
+                if (idx < 0) idx = 0;
+                const target = profiles[(idx - 1 + profiles.length) % profiles.length];
+                const email = target.email || target.dir;
+                appendLog(`Switching to previous profile: ${email}...`, 'info');
+                const res = await api.accountSwitch(email, target.dir);
+                appendLog(`Switched to ${res.active_user || email}`, 'success');
                 setTimeout(updateAccountStatus, 1500);
             } catch (err) {
                 appendLog('Switch failed: ' + err.message, 'error');
+            } finally {
+                _setAccountButtonsDisabled(false);
             }
         }
 
         async function reLoginCurrentProfile() {
+            _setAccountButtonsDisabled(true);
             try {
-                appendLog('Re-logging current profile...', 'info');
-                const btn = document.getElementById('btnReLogin');
-                if (btn) btn.disabled = true;
-                
-                const res = await api.reLoginCurrentProfile();
-                appendLog(`Re-login status: ${res.message}`, 'success');
+                const cfg = await api.getConfig();
+                const user = cfg.active_user;
+                const dir = cfg.active_profile || null;
+                if (!user) { appendLog('No active profile to re-login.', 'error'); return; }
+                appendLog(`Re-logging current profile: ${user}...`, 'info');
+                const res = await api.accountSwitch(user, dir);
+                appendLog(`Re-login complete: ${res.active_user || user}`, 'success');
                 setTimeout(updateAccountStatus, 1500);
             } catch (err) {
                 appendLog('Re-login failed: ' + err.message, 'error');
             } finally {
-                const btn = document.getElementById('btnReLogin');
-                if (btn) btn.disabled = false;
+                _setAccountButtonsDisabled(false);
             }
         }
 
