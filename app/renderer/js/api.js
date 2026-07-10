@@ -187,10 +187,6 @@ const api = {
         return this.request('/browser/download', 'POST', { save_dir: saveDir, naming, meta, service: activeService });
     },
 
-    processImages(paths, saveDir) {
-        return this.request('/browser/process', 'POST', { paths, save_dir: saveDir });
-    },
-
     attachFiles(filePaths, service = null) {
         const activeService = service || window.localConfig?.prewarm_tab || 'gemini';
         return this.request(`/browser/attach_files?service=${encodeURIComponent(activeService)}`, 'POST', filePaths);

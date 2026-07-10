@@ -38,8 +38,7 @@ def main():
             print(f"[FAIL] Failed to import {name}: {e}")
             sys.exit(1)
 
-    for mod in ("gemini_api_client", "processing_utils", "shared_state",
-                "inverse_alpha_compositing", "image_notifier", "lama_refiner", "automation"):
+    for mod in ("gemini_api_client", "image_notifier", "automation"):
         try_import(mod)
 
     # Classification test

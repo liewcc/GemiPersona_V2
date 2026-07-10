@@ -133,31 +133,6 @@ class GeminiAPIClient:
                     self._stats["refused"] += 1
             return {"status": "error", "message": error_msg}
 
-    # ── Watermark Removal (reuses project pipeline) ─────────────────────────
-    @staticmethod
-    def process_watermark(saved_paths: list, save_dir: str, use_gpu: bool = True):
-        """
-        Runs the existing LaMa-based watermark removal on the given paths.
-        Returns list of processed output paths.
-        """
-        from processing_utils import get_shared_processor, save_with_metadata
-        processor = get_shared_processor(use_gpu=use_gpu)
-        p_dir = os.path.join(save_dir, "processed")
-        os.makedirs(p_dir, exist_ok=True)
-
-        processed = []
-        for p_in in saved_paths:
-            if os.path.exists(p_in):
-                try:
-                    with Image.open(p_in) as img:
-                        final_img = processor.hybrid_process(img)
-                        p_path = os.path.join(p_dir, os.path.basename(p_in))
-                        save_with_metadata(final_img, img, p_path)
-                        processed.append(p_path)
-                except Exception as e:
-                    print(f"[API_GEN] Watermark removal failed for {p_in}: {e}")
-        return processed
-
     # ── Stop Signal ─────────────────────────────────────────────────────────
     def request_stop(self):
         self._stop_event.set()

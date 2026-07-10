@@ -261,31 +261,6 @@ async def profiles_save_ep(data: dict = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
-class ProcessRequest(BaseModel):
-    paths: list = []
-    save_dir: str = ""
-
-@app.post("/browser/process")
-async def process_images_ep(req: ProcessRequest):
-    try:
-        from processing_utils import get_shared_processor, save_with_metadata
-        from PIL import Image
-        # ponytail: GPU flag not wired to V2 config yet; default True. Upgrade: read automation.use_gpu.
-        processor = get_shared_processor(use_gpu=True)
-        p_dir = os.path.join(req.save_dir, "processed")
-        os.makedirs(p_dir, exist_ok=True)
-        processed_count = 0
-        for path in req.paths:
-            if os.path.exists(path):
-                with Image.open(path) as img:
-                    final_img = processor.hybrid_process(img)
-                    p_path = os.path.join(p_dir, os.path.basename(path))
-                    save_with_metadata(final_img, img, p_path)
-                    processed_count += 1
-        return {"status": "success", "processed_count": processed_count, "processed_dir": p_dir}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"detail": str(e)})
-
 @app.post("/browser/attach_files")
 async def attach_files_ep(file_paths: list = Body(...)):
     # Sync wrapper: converge engine attachments to the desired list via file/add + file/remove.

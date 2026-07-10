@@ -307,21 +307,7 @@ class AutomationManager:
                                     self.config["name_start"] = dl_data.get("next_start", dl_cfg["start"])
                                     self.automation_status["successes"] += 1
                                     self.automation_status["cycles"] += 1
-                                    
-                                    if self.config.get("remove_watermark"):
-                                        try:
-                                            import processing_utils
-                                            from PIL import Image
-                                            processor = processing_utils.get_shared_processor()
-                                            for p in saved_paths:
-                                                img = Image.open(p)
-                                                out_img = processor.hybrid_process(img)
-                                                processing_utils.save_with_metadata(out_img, img, p)
-                                        except ModuleNotFoundError:
-                                            logger.warning("processing_utils not found, skipping watermark removal.")
-                                        except Exception as e:
-                                            logger.warning(f"Watermark removal failed: {e}")
-                                    
+
                                     cycle_dur = time.time() - self._cycle_start_time
                                     lc_dur = time.time() - self._lc_cycle_start_time
                                     

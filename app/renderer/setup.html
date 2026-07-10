@@ -410,21 +410,6 @@
                         </div>
                     </div>
 
-                    <!-- WATERMARK REMOVAL -->
-                    <div class="card glass mb-0 p-20">
-                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">WATERMARK REMOVAL</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                            <div class="d-flex align-center justify-between">
-                                <label class="text-small mb-0" style="white-space: nowrap;">Remove Watermark</label>
-                                <label class="switch"><input type="checkbox" id="removeWmToggle" checked onchange="saveWatermarkSettings()"><span class="slider"></span></label>
-                            </div>
-                            <div class="d-flex align-center justify-between">
-                                <label class="text-small mb-0" style="white-space: nowrap;">Use GPU (CUDA)</label>
-                                <label class="switch"><input type="checkbox" id="useGpuToggle" checked onchange="saveWatermarkSettings()"><span class="slider"></span></label>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- AUTOMATION CONTROL -->
                     <div class="card glass mb-0 p-20">
                         <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">AUTOMATION CONTROL</div>
@@ -787,9 +772,6 @@
 
                 // Sync toggles and looping values
                 if (config.automation) {
-                    document.getElementById('removeWmToggle').checked = config.automation.remove_watermark !== false;
-                    document.getElementById('useGpuToggle').checked = config.automation.use_gpu !== false;
-                    
                     document.getElementById('autoLoopingToggle').checked = config.automation.auto_looping === true;
                     const autoModeVal = config.automation.mode || 'rounds';
                     const autoModeRadio = document.querySelector(`input[name="stopCondition"][value="${autoModeVal}"]`);
@@ -2065,19 +2047,6 @@
             });
         }
 
-        async function saveWatermarkSettings() {
-            if (isConfigLoading) return;
-            const removeWm = document.getElementById('removeWmToggle').checked;
-            const useGpu = document.getElementById('useGpuToggle').checked;
-            
-            const auto = localConfig.automation || {};
-            auto.remove_watermark = removeWm;
-            auto.use_gpu = useGpu;
-            
-            await api.saveConfig({ automation: auto });
-            appendLog(`Watermark / GPU preferences saved.`, 'success');
-        }
-
         async function triggerCaptureDom() {
             try {
                 appendLog('Capturing browser DOM...', 'info');
@@ -2261,16 +2230,6 @@
                         const nextStart = dlResp.next_start || start;
                         document.getElementById('nameStartInput').value = nextStart;
                         await api.saveConfig({ name_start: nextStart });
-                        
-                        const removeWm = document.getElementById('removeWmToggle').checked;
-                        if (removeWm && savedPaths.length > 0) {
-                            const procResp = await api.processImages(savedPaths, saveDir);
-                            if (procResp.status === 'success') {
-                                appendLog(`CLEANED: ${procResp.processed_count} images.`, 'success');
-                            } else {
-                                appendLog(`CLEAN FAILED: ${JSON.stringify(procResp)}`, 'error');
-                            }
-                        }
                     } else {
                         appendLog(`DOWNLOAD FAILED: ${dlResp.message}`, 'error');
                     }
@@ -2330,16 +2289,6 @@
                             const nextStart = dlResp.next_start || start;
                             document.getElementById('nameStartInput').value = nextStart;
                             await api.saveConfig({ name_start: nextStart });
-                            
-                            const removeWm = document.getElementById('removeWmToggle').checked;
-                            if (removeWm && savedPaths.length > 0) {
-                                const procResp = await api.processImages(savedPaths, saveDir);
-                                if (procResp.status === 'success') {
-                                    appendLog(`CLEANED: ${procResp.processed_count} images.`, 'success');
-                                } else {
-                                    appendLog(`CLEAN FAILED: ${JSON.stringify(procResp)}`, 'error');
-                                }
-                            }
                         } else {
                             appendLog(`DOWNLOAD FAILED: ${dlResp.message}`, 'error');
                         }
