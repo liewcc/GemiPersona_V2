@@ -78,6 +78,16 @@ Pop-Location
 if ($npmExit -ne 0) { Write-Error "npm install failed"; exit 1 }
 Write-Host "  Done." -ForegroundColor Green
 
+# ── Default: hide CLI window on startup (first install only) ──
+# ponytail: "data\ missing" is the first-install heuristic; the flag is
+# toggled later via System Config, so re-running setup must not resurrect it.
+$dataDir = Join-Path $workDir "data"
+if (-not (Test-Path $dataDir)) {
+    New-Item -ItemType Directory -Path $dataDir | Out-Null
+    Set-Content -Path (Join-Path $dataDir "hide_cli.flag") -Value "true" -Encoding ascii
+    Write-Host "`n  Hide-CLI-on-startup enabled by default (start via run.vbs)." -ForegroundColor Green
+}
+
 # ── Done ──────────────────────────────────────────────────────
 Write-Host "`n============================================================" -ForegroundColor Cyan
 Write-Host "  Setup complete." -ForegroundColor Cyan

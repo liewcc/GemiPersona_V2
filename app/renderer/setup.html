@@ -6,6 +6,38 @@
     <title>GemiPersonaPro - Setup</title>
     <link rel="stylesheet" href="styles/main.css">
     <style>
+        /* Version pill badges (sidebar): green = up to date, red = update available */
+        .ver-badge {
+            display: inline-block;
+            align-self: flex-start;
+            padding: 3px 11px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            border: 1px solid transparent;
+            background: rgba(150, 150, 150, 0.12);
+            border-color: rgba(150, 150, 150, 0.3);
+            color: var(--text-muted, #888);
+            user-select: none;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .ver-badge.ver-current {
+            background: rgba(0, 200, 100, 0.12);
+            border-color: rgba(0, 200, 100, 0.38);
+            color: #4caf87;
+        }
+        .ver-badge.ver-update {
+            background: rgba(255, 60, 60, 0.15);
+            border-color: rgba(255, 60, 60, 0.5);
+            color: #ff5c5c;
+            cursor: pointer;
+        }
+        .ver-badge.ver-update:hover {
+            background: rgba(255, 60, 60, 0.26);
+            border-color: rgba(255, 60, 60, 0.75);
+        }
+
         /* Modal Overlay for Aspect Ratio Looping Table */
         .modal-overlay {
             position: fixed;
@@ -138,10 +170,10 @@
             <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
                 📂 Open Download Folder
             </a>
-            <!-- Version display -->
-            <div style="margin-top:auto; padding:12px 24px 0; font-size:11px; color:var(--text-muted, #888); line-height:1.6;">
-                <div>UI <span id="uiVersionText">?.?.?</span></div>
-                <div>Engine <span id="engineVersionText">?.?.?</span></div>
+            <!-- Version display: green pill = up to date, red pill = update available (click to update & restart) -->
+            <div style="margin-top:auto; padding:12px 24px 16px; display:flex; flex-direction:column; gap:8px;">
+                <span id="uiVersionBadge" class="ver-badge" title="Checking for updates…">UI ?.?.?</span>
+                <span id="engineVersionBadge" class="ver-badge" title="Checking for updates…">Engine ?.?.?</span>
             </div>
         </div>
 
@@ -2717,42 +2749,64 @@
             }
         }
 
-        // ── Update & Relaunch ─────────────────────────────────────────────────
-        async function checkForUpdates() {
+        // ── Version badges + Update & Relaunch ────────────────────────────────
+        // Paints one sidebar pill: green when current, red + clickable when an
+        // update is available. `updateLabel` is "local→remote" (or null/falsy).
+        function paintVersionBadge(id, label, localVer, updateLabel) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = `${label} v${localVer || '?.?.?'}`;
+            if (updateLabel) {
+                const remote = String(updateLabel).split('→')[1] || '';
+                el.className = 'ver-badge ver-update';
+                el.title = `New version v${remote} available — click to update & restart`;
+                el.onclick = (e) => triggerUpdateAndRelaunch(e);
+            } else {
+                el.className = 'ver-badge ver-current';
+                el.title = 'Up to date';
+                el.onclick = null;
+            }
+        }
+
+        // Renders local versions immediately, then colours each badge once the
+        // remote check returns. Also keeps the legacy MAINTENANCE button in sync.
+        async function refreshVersionBadges() {
+            let local = { ui: '?.?.?', engine: '?.?.?' };
+            try { local = await window.electronAPI.getVersions(); } catch (_) {}
+            paintVersionBadge('uiVersionBadge',     'UI',     local.ui,     null);
+            paintVersionBadge('engineVersionBadge', 'Engine', local.engine, null);
+
             try {
                 const result = await window.electronAPI.checkForUpdates();
+                paintVersionBadge('uiVersionBadge',     'UI',     local.ui,     result.main);
+                paintVersionBadge('engineVersionBadge', 'Engine', local.engine, result.engine);
+
                 const parts = [];
                 if (result.main)   parts.push(`App ${result.main}`);
                 if (result.engine) parts.push(`Engine ${result.engine}`);
                 const btn = document.getElementById('btnUpdateRelaunch');
-                if (parts.length > 0) {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                        btn.style.cursor  = 'pointer';
-                        btn.textContent   = '⬆ Update & Relaunch (' + parts.join(', ') + ')';
-                    }
+                if (btn && parts.length > 0) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.style.cursor  = 'pointer';
+                    btn.textContent   = '⬆ Update & Relaunch (' + parts.join(', ') + ')';
                 }
             } catch (e) {
                 console.log('checkForUpdates error:', e);
             }
         }
 
-        // Fetches local UI and engine version numbers and fills the sidebar display
-        async function loadVersions() {
-            try {
-                const versions = await window.electronAPI.getVersions();
-                const uiEl  = document.getElementById('uiVersionText');
-                const engEl = document.getElementById('engineVersionText');
-                if (uiEl  && versions.ui)     uiEl.textContent  = 'v' + versions.ui;
-                if (engEl && versions.engine) engEl.textContent = 'v' + versions.engine;
-            } catch (_) { /* silent on failure */ }
-        }
-
+        let updateInProgress = false;
         async function triggerUpdateAndRelaunch(event) {
             if (event) event.preventDefault();
+            if (updateInProgress) return;   // guard against double-clicking a red badge
+            updateInProgress = true;
             const btn = document.getElementById('btnUpdateRelaunch');
             if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = '⏳ Updating...'; }
+            ['uiVersionBadge', 'engineVersionBadge'].forEach(id => {
+                const b = document.getElementById(id);
+                if (b) { b.onclick = null; b.title = 'Updating…'; }
+            });
             appendLog('Running git pull...', 'info');
             try {
                 const res = await window.electronAPI.runUpdate();
@@ -2760,6 +2814,8 @@
                 if (!res.ok) {
                     appendLog('Git update had errors — aborting relaunch.', 'error');
                     if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '⬆ Update & Relaunch'; }
+                    updateInProgress = false;
+                    refreshVersionBadges();   // restore badge colours/click handlers
                     return;
                 }
                 appendLog('Update complete. Relaunching...', 'success');
@@ -2767,6 +2823,8 @@
             } catch (e) {
                 appendLog('Update failed: ' + e.message, 'error');
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '⬆ Update & Relaunch'; }
+                updateInProgress = false;
+                refreshVersionBadges();
             }
         }
 
@@ -2805,8 +2863,7 @@
             bindLcChangeEvents();
             refreshLogs(); // Fetch history immediately on load
             
-            checkForUpdates();
-            loadVersions();
+            refreshVersionBadges();
             setInterval(() => {
                 updateAccountStatus();
                 updateAutomationStats();
