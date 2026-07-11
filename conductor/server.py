@@ -214,11 +214,6 @@ async def reset_time_timer():
 # These present the V1 (DT) API surface the Electron UI expects, remapping to the
 # V2 engine or handling locally. MUST be declared BEFORE the catch-all proxy below.
 
-@app.post("/engine/clear_logs")
-async def clear_logs_ep():
-    # V2 auto-rotates via RotatingFileHandler; nothing to clear.
-    return {"status": "success"}
-
 @app.get("/engine/preset")
 async def get_preset_ep(path: str):
     if not os.path.exists(path):

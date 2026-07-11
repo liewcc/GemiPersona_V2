@@ -112,10 +112,6 @@ const api = {
         return this.request(`/browser/gem_title${query}`);
     },
     
-    clearLogs() {
-        return this.request('/engine/clear_logs', 'POST');
-    },
-    
     clearEngineLogs() {
         return this.request('/engine/clear_logs', 'POST');
     },

@@ -418,10 +418,13 @@ input:checked + .slider:before {
   white-space: pre-wrap;
 }
 
-.log-console span.error { color: #ff7b72; }
-.log-console span.warn { color: #d2a8ff; }
-.log-console span.info { color: #79c0ff; }
-.log-console span.success { color: #56d364; }
+/* Each log entry is its own block element (one line = one node), so the DOM
+   line-count cap in refreshLogs is exact and no <br> spacers are needed. */
+.log-console .log-line { display: block; }
+.log-console .error { color: #ff7b72; }
+.log-console .warn { color: #d2a8ff; }
+.log-console .info { color: #79c0ff; }
+.log-console .success { color: #56d364; }
 
 /* Status Indicators (Pulsing ring mimicking comfyUI listener) */
 .status-indicator {

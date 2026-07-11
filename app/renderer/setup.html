@@ -601,7 +601,7 @@
                             </div>
                         </div>
                         <div id="setupLogContainer" class="log-console flex-grow-1" style="flex: 1; min-height: 0; overflow-y: auto;">
-                            <span class="info">Ready for setup tasks.</span><br>
+                            <div class="log-line info">Ready for setup tasks.</div>
                         </div>
                     </div>
                 </div>
@@ -2621,7 +2621,7 @@
             if (clean.toLowerCase().includes('error') || clean.toLowerCase().includes('failed')) cls = 'error';
             else if (clean.toLowerCase().includes('warn')) cls = 'warn';
             else if (clean.toLowerCase().includes('success') || clean.toLowerCase().includes('downloaded') || clean.toLowerCase().includes('cleaned')) cls = 'success';
-            return `<span class="${cls}">${clean}</span>`;
+            return `<div class="log-line ${cls}">${clean}</div>`;
         }
 
         async function refreshLogs() {
@@ -2642,25 +2642,51 @@
                     newLines = anchor === -1 ? logs : logs.slice(anchor + 1);
                 }
                 if (!newLines.length) { hasLoadedHistory = true; return; }
+
+                // Skip DOM mutation while the user is actively selecting text inside
+                // the console — rebuilding nodes would wipe the selection mid-drag and
+                // make highlight/copy impossible. The tail is still there next poll.
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed && container.contains(sel.anchorNode)) {
+                    return;
+                }
                 lastEngineLogLine = logs[logs.length - 1];
 
-                const html = newLines.slice().reverse().map(renderEngineLogLine).join('<br>') + '<br>';
+                const html = newLines.slice().reverse().map(renderEngineLogLine).join('');
                 const isAtTop = container.scrollTop <= 15;
+                // insertAdjacentHTML only parses+inserts the new lines; it leaves the
+                // existing nodes (and any selection on them) untouched — unlike a full
+                // innerHTML rewrite which destroys and recreates every node each poll.
                 if (!hasLoadedHistory) {
                     container.innerHTML = html;
                     hasLoadedHistory = true;
                     container.scrollTop = 0;
                 } else {
-                    container.innerHTML = html + container.innerHTML;
+                    container.insertAdjacentHTML('afterbegin', html);
                     if (isAtTop) container.scrollTop = 0;
                 }
+                trimLogContainer(container);
             } catch (err) {
                 console.error(err);
             }
         }
 
+        // Cap console DOM at MAX_LOG_LINES. Each line is one .log-line block, so
+        // childElementCount is an exact line count. Newest lines are prepended, so
+        // trim from the bottom (oldest).
+        const MAX_LOG_LINES = 500;
+        function trimLogContainer(container) {
+            while (container.childElementCount > MAX_LOG_LINES) {
+                container.removeChild(container.lastElementChild);
+            }
+        }
+
         function clearSetupLogs() {
             document.getElementById('setupLogContainer').innerHTML = '';
+            // Reset the poll anchors, otherwise refreshLogs still holds the old tail
+            // as "already shown" and the next poll re-dumps it — logs reappear.
+            lastEngineLogLine = null;
+            hasLoadedHistory = false;
         }
 
         function appendLog(msg, type='info') {
@@ -2668,9 +2694,10 @@
             const now = new Date();
             const pad = (n) => String(n).padStart(2, '0');
             const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-            const logLine = `<span class="${type}">${time} ${type.toUpperCase()} UI ${msg}</span><br>`;
+            const logLine = `<div class="log-line ${type}">${time} ${type.toUpperCase()} UI ${msg}</div>`;
             const isAtTop = container.scrollTop <= 15;
-            container.innerHTML = logLine + container.innerHTML;
+            container.insertAdjacentHTML('afterbegin', logLine);
+            trimLogContainer(container);
             if (isAtTop) {
                 setTimeout(() => {
                     container.scrollTop = 0;
