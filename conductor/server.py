@@ -140,7 +140,7 @@ async def health_check():
 
 from pydantic import BaseModel
 from fastapi import Body
-from automation import AutomationManager, load_refused_keywords, save_refused_keywords, load_quota_keywords, save_quota_keywords
+from automation import AutomationManager, load_refused_keywords, save_refused_keywords, load_quota_keywords, save_quota_keywords, do_account_switch
 
 automation_manager = AutomationManager(get_engine_url, ensure_service)
 
@@ -290,88 +290,13 @@ class AccountSwitchRequest(BaseModel):
 
 @app.post("/account/switch")
 async def account_switch_ep(req: AccountSwitchRequest):
-    """Switch the active Chrome profile. Implements the proven 6-step sequence
-    from Gemi_MCP_V2 doSwitchAccount: stop → config → kill Chromium → remove
-    sandbox junctions → sleep → start."""
-    await ensure_service()
-    base = get_engine_url()
+    """Switch the active Chrome profile. Delegates to automation.do_account_switch
+    (the proven 6-step sequence: stop -> config -> kill Chromium -> remove sandbox
+    junctions -> sleep -> start) so this HTTP endpoint and the automation loop's
+    rotation/quota paths share one implementation."""
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            # 1. Stop current browser (ignore failure if already stopped)
-            try:
-                await client.post(f"{base}/engine/stop")
-            except Exception:
-                pass
-
-            # 2. Persist chosen profile + user to engine config
-            await client.post(
-                f"{base}/engine/config",
-                json={"active_profile": req.profile_dir, "active_user": req.username},
-            )
-
-            # 3. Kill Playwright Chromium to release file locks
-            try:
-                subprocess.run(
-                    [
-                        "powershell", "-NoProfile", "-Command",
-                        "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
-                        "Where-Object { $_.Path -like '*ms-playwright*' } | "
-                        "Stop-Process -Force -ErrorAction SilentlyContinue",
-                    ],
-                    timeout=15,
-                    capture_output=True,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-            except Exception:
-                pass
-
-            # 4. Remove BOTH sandbox junctions (os.rmdir only — NTFS junction safe)
-            for sandbox_root in (BASE_DIR, ENGINE_DIR):
-                junction = os.path.join(sandbox_root, "browser_session_sandbox", "Default")
-                try:
-                    if os.path.exists(junction):
-                        os.rmdir(junction)
-                except Exception:
-                    pass
-
-            # 5. Let FS handles settle
-            await asyncio.sleep(1)
-
-            # 6. Read config.json and start browser into the target profile
-            cfg = {}
-            try:
-                with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
-                    cfg = json.load(f)
-            except Exception:
-                pass
-            headless = bool(cfg.get("headless", False))
-            active_service = cfg.get("active_service")
-            start_payload = {"headless": headless, "active_user": req.username}
-            if active_service:
-                start_payload["active_service"] = active_service
-            start_resp = await client.post(f"{base}/engine/start", json=start_payload)
-            engine_start = start_resp.json() if start_resp.status_code == 200 else {"error": start_resp.text}
-
-        # Diagnostic: resolve what the sandbox junction points to after restart
-        junction_target = None
-        try:
-            junction_target = os.readlink(
-                os.path.join(ENGINE_DIR, "browser_session_sandbox", "Default")
-            )
-        except Exception:
-            try:
-                junction_target = os.readlink(
-                    os.path.join(BASE_DIR, "browser_session_sandbox", "Default")
-                )
-            except Exception:
-                pass
-
-        return {
-            "ok": True,
-            "active_user": req.username,
-            "engine_start": engine_start,
-            "junction_target": junction_target,
-        }
+        result = await do_account_switch(get_engine_url, ensure_service, req.username, req.profile_dir)
+        return result
     except Exception as e:
         logger.error(f"Account switch failed: {e}")
         return JSONResponse(status_code=502, content={"ok": False, "detail": str(e)})

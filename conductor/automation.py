@@ -4,6 +4,7 @@ import httpx
 import os
 import json
 import logging
+import subprocess
 import traceback
 
 logger = logging.getLogger('conductor')
@@ -11,6 +12,10 @@ logger = logging.getLogger('conductor')
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 REFUSED_FILE = os.path.join(DATA_DIR, "refused_keywords.json")
 QUOTA_FILE = os.path.join(DATA_DIR, "quota_full_keywords.json")
+
+# conductor/automation.py -> conductor/ -> project root (same computation server.py uses for BASE_DIR)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENGINE_DIR = os.path.join(BASE_DIR, "Gemi_Engine_V2")
 
 def load_keywords(filepath):
     if not os.path.exists(filepath):
@@ -74,6 +79,92 @@ def write_png_metadata(paths, config):
                 img.save(p, "PNG", pnginfo=meta)
         except Exception as e:
             logger.warning(f"PNG metadata write failed for {p}: {e}")
+
+def filter_ghost_profiles(profiles: list) -> list:
+    """Drop profile entries whose browser_user_data directory doesn't exist on disk."""
+    user_data_root = os.path.join(ENGINE_DIR, "browser_user_data")
+    return [
+        p for p in profiles
+        if p.get("dir") and os.path.isdir(os.path.join(user_data_root, p["dir"]))
+    ]
+
+async def do_account_switch(get_engine_url_fn, ensure_service_fn, username: str, profile_dir: str | None = None) -> dict:
+    """The proven 6-step account switch (stop -> persist config -> kill orphan
+    chromium -> remove sandbox junctions -> sleep -> start), shared by the
+    /account/switch HTTP endpoint (server.py) and the automation loop's
+    rotation/quota paths, so both go through identical, tested logic."""
+    if ensure_service_fn:
+        await ensure_service_fn()
+    base = get_engine_url_fn()
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        try:
+            await client.post(f"{base}/engine/stop")
+        except Exception:
+            pass
+
+        await client.post(
+            f"{base}/engine/config",
+            json={"active_profile": profile_dir, "active_user": username},
+        )
+
+        try:
+            subprocess.run(
+                [
+                    "powershell", "-NoProfile", "-Command",
+                    "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
+                    "Where-Object { $_.Path -like '*ms-playwright*' } | "
+                    "Stop-Process -Force -ErrorAction SilentlyContinue",
+                ],
+                timeout=15,
+                capture_output=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        except Exception:
+            pass
+
+        for sandbox_root in (BASE_DIR, ENGINE_DIR):
+            junction = os.path.join(sandbox_root, "browser_session_sandbox", "Default")
+            try:
+                if os.path.exists(junction):
+                    os.rmdir(junction)
+            except Exception:
+                pass
+
+        await asyncio.sleep(1)
+
+        cfg = {}
+        try:
+            with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            pass
+        headless = bool(cfg.get("headless", False))
+        active_service = cfg.get("active_service")
+        start_payload = {"headless": headless, "active_user": username}
+        if active_service:
+            start_payload["active_service"] = active_service
+        start_resp = await client.post(f"{base}/engine/start", json=start_payload)
+        engine_start = start_resp.json() if start_resp.status_code == 200 else {"error": start_resp.text}
+
+    junction_target = None
+    try:
+        junction_target = os.readlink(
+            os.path.join(ENGINE_DIR, "browser_session_sandbox", "Default")
+        )
+    except Exception:
+        try:
+            junction_target = os.readlink(
+                os.path.join(BASE_DIR, "browser_session_sandbox", "Default")
+            )
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "active_user": username,
+        "engine_start": engine_start,
+        "junction_target": junction_target,
+    }
 
 class AutomationManager:
     def __init__(self, get_engine_url_fn, ensure_service_fn=None):
@@ -417,7 +508,7 @@ class AutomationManager:
 
     async def _switch_to_next_profile(self):
         resp = await self._get("/engine/profiles")
-        profiles = resp.json().get("profiles", [])
+        profiles = filter_ghost_profiles(resp.json().get("profiles", []))
         if not profiles:
             return
             
@@ -429,9 +520,10 @@ class AutomationManager:
                 break
         
         next_idx = (idx + 1) % len(profiles)
-        next_user = profiles[next_idx].get("email") or profiles[next_idx].get("name")
+        next_profile = profiles[next_idx]
+        next_user = next_profile.get("email") or next_profile.get("name")
         
-        await self._post("/engine/switch_account", {"username": next_user})
+        await do_account_switch(self.get_engine_url, self.ensure_service, next_user, next_profile.get("dir"))
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
 
@@ -439,7 +531,7 @@ class AutomationManager:
         await self._post("/engine/stop", {})
         
         resp = await self._get("/engine/profiles")
-        profiles = resp.json().get("profiles", [])
+        profiles = filter_ghost_profiles(resp.json().get("profiles", []))
         
         cur = self.automation_status["current_account_id"]
         idx = -1
@@ -449,7 +541,8 @@ class AutomationManager:
                 break
         
         next_idx = (idx + 1) % len(profiles)
-        next_user = profiles[next_idx].get("email") or profiles[next_idx].get("name")
+        next_profile = profiles[next_idx]
+        next_user = next_profile.get("email") or next_profile.get("name")
         
         initial = self.automation_status["initial_user"]
         
@@ -468,6 +561,6 @@ class AutomationManager:
                 if self._stop_event.is_set():
                     return
         
-        await self._post("/engine/switch_account", {"username": next_user})
+        await do_account_switch(self.get_engine_url, self.ensure_service, next_user, next_profile.get("dir"))
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
