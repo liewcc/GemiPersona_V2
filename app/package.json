@@ -1,6 +1,6 @@
 {
   "name": "gemipersona-v2",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "GemiPersonaPro with Electron UI",
   "main": "main.js",
   "scripts": {
