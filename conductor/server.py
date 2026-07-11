@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 _registered_service_pid = None
+_spawn_lock = asyncio.Lock()
 
 # Config
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,7 +65,7 @@ def get_engine_url():
 async def ensure_service():
     global _registered_service_pid
     url = get_engine_url()
-    
+
     async def _check_and_register(resp):
         global _registered_service_pid
         data = resp.json()
@@ -78,46 +79,48 @@ async def ensure_service():
             except Exception as e:
                 logger.error(f"Failed to register with engine: {e}")
 
-    try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
-            resp = await client.get(f"{url}/health")
-            if resp.status_code == 200:
-                await _check_and_register(resp)
-                return True
-    except Exception:
-        pass
-    
-    logger.info("Engine unreachable. Spawning new engine process...")
-    try:
-        out_file = open(ENGINE_OUT, "a")
-        subprocess.Popen(
-            [ENGINE_VENV_PYTHON, ENGINE_SCRIPT],
-            cwd=ENGINE_DIR,
-            stdout=out_file,
-            stderr=out_file
-        )
-    except Exception as e:
-        logger.error(f"Failed to spawn engine: {e}")
-        return False
-
-    # Poll /health up to ~20s
-    start_time = time.time()
-    engine_up = False
-    while time.time() - start_time < 20:
+    async def _probe():
+        """Return True if the engine answers /health (and register if it's new)."""
         try:
             async with httpx.AsyncClient(timeout=1.0) as client:
                 resp = await client.get(f"{url}/health")
                 if resp.status_code == 200:
                     await _check_and_register(resp)
-                    engine_up = True
-                    break
+                    return True
         except Exception:
             pass
-        await asyncio.sleep(1)
-        
-    if engine_up:
+        return False
+
+    # Fast path: engine already up — no lock, no contention on the hot proxy path.
+    if await _probe():
         return True
-    else:
+
+    # Slow path: serialize spawning so concurrent callers don't each spawn a
+    # duplicate engine process (the previous behaviour spawned N ghosts on races).
+    async with _spawn_lock:
+        # Re-check: another caller may have spawned while we waited for the lock.
+        if await _probe():
+            return True
+
+        logger.info("Engine unreachable. Spawning new engine process...")
+        try:
+            out_file = open(ENGINE_OUT, "a")
+            subprocess.Popen(
+                [ENGINE_VENV_PYTHON, ENGINE_SCRIPT],
+                cwd=ENGINE_DIR,
+                stdout=out_file,
+                stderr=out_file
+            )
+        except Exception as e:
+            logger.error(f"Failed to spawn engine: {e}")
+            return False
+
+        # Poll /health up to ~20s
+        start_time = time.time()
+        while time.time() - start_time < 20:
+            if await _probe():
+                return True
+            await asyncio.sleep(1)
         logger.error("Engine failed to start within 20s.")
         return False
 

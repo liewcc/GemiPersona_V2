@@ -2611,36 +2611,48 @@
         }
 
         let hasLoadedHistory = false;
+        let lastEngineLogLine = null;  // anchor: newest raw engine line already rendered
+
+        function renderEngineLogLine(l) {
+            const clean = l.trimEnd()
+                .replace(/^\d{4}-\d{2}-\d{2}\s+/, '')
+                .replace(/ {2,}/g, ' ');
+            let cls = 'info';
+            if (clean.toLowerCase().includes('error') || clean.toLowerCase().includes('failed')) cls = 'error';
+            else if (clean.toLowerCase().includes('warn')) cls = 'warn';
+            else if (clean.toLowerCase().includes('success') || clean.toLowerCase().includes('downloaded') || clean.toLowerCase().includes('cleaned')) cls = 'success';
+            return `<span class="${cls}">${clean}</span>`;
+        }
 
         async function refreshLogs() {
             try {
-                const fetchHistory = !hasLoadedHistory;
-                const data = await api.getEngineLogs(fetchHistory);
+                const data = await api.getEngineLogs(!hasLoadedHistory);
                 const container = document.getElementById('setupLogContainer');
-                if (data.logs && data.logs.length > 0) {
-                    const reversedLogs = [...data.logs].reverse();
-                    const newHtml = reversedLogs.map(l => {
-                        let cls = 'info';
-                        if (l.toLowerCase().includes('error') || l.toLowerCase().includes('failed')) cls = 'error';
-                        else if (l.toLowerCase().includes('warn')) cls = 'warn';
-                        else if (l.toLowerCase().includes('success') || l.toLowerCase().includes('downloaded') || l.toLowerCase().includes('cleaned')) cls = 'success';
-                        return `<span class="${cls}">${l}</span>`;
-                    }).join('<br>') + '<br>';
-                    
-                    const isAtTop = container.scrollTop <= 15;
-                    if (fetchHistory) {
-                        container.innerHTML = newHtml;
-                        hasLoadedHistory = true;
-                        container.scrollTop = 0;
-                    } else {
-                        container.innerHTML = newHtml + container.innerHTML;
-                        if (isAtTop) {
-                            container.scrollTop = 0;
-                        }
-                    }
-                } else if (fetchHistory) {
+                const logs = (data.logs || []).map(l => l.trimEnd()).filter(l => l.length);
+                if (!logs.length) { hasLoadedHistory = true; return; }
+
+                // /engine/logs always returns the last N lines (a sliding tail). Only
+                // render lines newer than the last one we already showed, otherwise
+                // every poll re-dumps the whole tail and buries other messages.
+                let newLines;
+                if (lastEngineLogLine === null) {
+                    newLines = logs;                        // first load: show all history
+                } else {
+                    const anchor = logs.lastIndexOf(lastEngineLogLine);
+                    newLines = anchor === -1 ? logs : logs.slice(anchor + 1);
+                }
+                if (!newLines.length) { hasLoadedHistory = true; return; }
+                lastEngineLogLine = logs[logs.length - 1];
+
+                const html = newLines.slice().reverse().map(renderEngineLogLine).join('<br>') + '<br>';
+                const isAtTop = container.scrollTop <= 15;
+                if (!hasLoadedHistory) {
+                    container.innerHTML = html;
                     hasLoadedHistory = true;
                     container.scrollTop = 0;
+                } else {
+                    container.innerHTML = html + container.innerHTML;
+                    if (isAtTop) container.scrollTop = 0;
                 }
             } catch (err) {
                 console.error(err);
@@ -2656,7 +2668,7 @@
             const now = new Date();
             const pad = (n) => String(n).padStart(2, '0');
             const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-            const logLine = `<span class="${type}">[${time}] ${msg}</span><br>`;
+            const logLine = `<span class="${type}">${time} ${type.toUpperCase()} UI ${msg}</span><br>`;
             const isAtTop = container.scrollTop <= 15;
             container.innerHTML = logLine + container.innerHTML;
             if (isAtTop) {
