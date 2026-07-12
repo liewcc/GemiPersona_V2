@@ -141,6 +141,7 @@ async def health_check():
 from pydantic import BaseModel
 from fastapi import Body
 from automation import AutomationManager, load_refused_keywords, save_refused_keywords, load_quota_keywords, save_quota_keywords, do_account_switch
+import health_db
 
 automation_manager = AutomationManager(get_engine_url, ensure_service)
 
@@ -184,6 +185,30 @@ async def get_automation_stats():
         automation_manager.automation_status["pending_resets"] = 0
         
     return stats
+
+@app.get("/health/events")
+async def health_events(date_from: str = None, date_to: str = None,
+                        account: str = None, run_id: str = None,
+                        limit: int = 2000):
+    return {"events": health_db.query_events(date_from, date_to, account, run_id, limit)}
+
+@app.get("/health/summary")
+async def health_summary(date_from: str = None, date_to: str = None,
+                         group_by: str = "account"):
+    if group_by not in ("account", "day"):
+        return JSONResponse(status_code=422, content={"detail": "group_by must be 'account' or 'day'"})
+    return {"summary": health_db.summary(date_from, date_to, group_by)}
+
+@app.get("/health/runs")
+async def health_runs(limit: int = 50):
+    return {"runs": health_db.list_runs(limit)}
+
+@app.post("/health/clear")
+async def health_clear(data: dict = Body(...)):
+    before = data.get("before")
+    if not before:
+        return JSONResponse(status_code=422, content={"detail": "'before' (YYYY-MM-DD) required"})
+    return {"deleted": health_db.delete_before(before)}
 
 @app.get("/engine/refused_keywords")
 async def get_refused_keywords_ep():

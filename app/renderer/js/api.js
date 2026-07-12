@@ -206,17 +206,14 @@ const api = {
         });
     },
 
-    getAccountHealth(targetAccount = 'ALL_EVENTS', logPath = null) {
-        let query = `?target_account=${encodeURIComponent(targetAccount)}`;
-        if (logPath) {
-            query += `&log_path=${encodeURIComponent(logPath)}`;
-        }
-        return this.request(`/engine/account_health${query}`);
+    getHealthEvents(params = {}) {
+        const q = new URLSearchParams(params).toString();
+        return this.request(`/health/events${q ? '?' + q : ''}`);
     },
 
-    getAccountCycles(logPath = null) {
-        const query = logPath ? `?log_path=${encodeURIComponent(logPath)}` : '';
-        return this.request(`/engine/account_cycles${query}`);
+    getHealthSummary(params = {}) {
+        const q = new URLSearchParams(params).toString();
+        return this.request(`/health/summary${q ? '?' + q : ''}`);
     },
 
     getProfilesStatus() {
@@ -242,12 +239,12 @@ const api = {
         });
     },
 
-    deleteCycles(cycles, logPath = null) {
-        return this.request('/engine/delete_cycles', 'POST', { cycles, log_path: logPath });
+    getHealthRuns(limit = 50) {
+        return this.request(`/health/runs?limit=${limit}`);
     },
 
-    saveCycles(cycles, savePath, logPath = null) {
-        return this.request('/engine/save_cycles', 'POST', { cycles, save_path: savePath, log_path: logPath });
+    clearHealthBefore(dateStr) {
+        return this.request('/health/clear', 'POST', { before: dateStr });
     },
 
     continueAutomation(mode, goal, config, clearPending = false) {

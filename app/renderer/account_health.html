@@ -6,379 +6,116 @@
     <title>GemiPersona V2 - Account Health</title>
     <link rel="stylesheet" href="styles/main.css">
     <style>
-        /* Tabs Header styling */
-        .tabs-header {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-            gap: 10px;
-            padding-bottom: 0;
+        .health-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+            min-height: 0;
+            flex-grow: 1;
         }
-        
-        .tab-btn {
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            color: var(--text-muted);
-            padding: 10px 15px;
-            font-weight: 500;
-            font-size: 14px;
-            cursor: pointer;
-            transition: var(--transition);
-            font-family: var(--font-sans);
-        }
-        
-        .tab-btn:hover {
-            color: var(--text-main);
-            border-bottom-color: hsla(263, 80%, 65%, 0.3);
-        }
-        
-        .tab-btn.active {
-            color: var(--text-main);
-            border-bottom-color: var(--accent) !important;
-            font-weight: 600;
-        }
-        
-        .tab-content {
-            display: none;
-            position: absolute;
-            inset: 0;
-            overflow-y: auto;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-
-        /* Tab 1 needs internal flex layout for the chart to fill height */
-        #tab-analysis.active {
+        .chart-card {
+            height: 350px;
             display: flex;
             flex-direction: column;
         }
-        
-        /* Tab 5 (Account Credentials) needs internal flex layout to fill height and hide outer scroll */
-        #tab-credentials.active {
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Chart Canvas wrapper */
         .chart-container {
             position: relative;
+            flex-grow: 1;
             width: 100%;
-            height: 400px;
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            padding: 15px;
-            margin-bottom: 15px;
+            height: calc(100% - 30px);
         }
-
-        /* Data Table container */
-        .table-container {
-            width: 100%;
+        .controls-card {
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .runs-card {
+            flex-grow: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .table-scroll {
             overflow-y: auto;
+            flex-grow: 1;
             border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             background: rgba(0, 0, 0, 0.2);
-            height: 400px;
-            margin-bottom: 15px;
         }
-        
         .health-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            text-align: left;
         }
-        
         .health-table th, .health-table td {
             padding: 10px 12px;
+            text-align: left;
             border-bottom: 1px solid var(--border);
-            color: var(--text-main);
         }
-        
-        #credentialsTable th, #credentialsTable td {
-            white-space: nowrap;
-        }
-        
         .health-table th {
             background: var(--bg-tertiary);
             font-weight: 600;
             color: var(--text-muted);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
             position: sticky;
             top: 0;
             z-index: 1;
         }
-        
-        .health-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        
-        /* Badges */
-        .status-badge {
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-success { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
-        .status-refused { background: rgba(160, 160, 255, 0.15); color: #a0a0ff; }
-        .status-reset { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
-        .status-fail { background: rgba(255, 153, 153, 0.15); color: #ff9999; }
-        
-        /* Layout Grid – single column now that panel moved to side */
-        .health-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-            min-height: 0;
-            flex-grow: 1;
-        }
-        
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 1.5fr 1.5fr 1fr;
-            gap: 15px;
-        }
-        
-        /* Slider styling */
-        .slider-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .slider-val {
-            min-width: 30px;
-            text-align: right;
-            font-weight: 600;
-            color: var(--accent);
-            font-family: var(--font-sans);
-        }
-        
-        input[type="range"] {
-            accent-color: var(--accent);
-            cursor: pointer;
-        }
-
-        /* ── In-sidebar Account Status block ─────────────────────── */
-        .sidebar-account-panel {
-            margin-top: 16px;
-            padding: 12px 10px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            flex-grow: 1;            /* pushes to fill remaining sidebar height */
-            overflow-y: auto;
-            transition: opacity 0.2s ease;
-        }
-
-        .sidebar-account-panel.hidden {
+        .status-banner {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            margin-bottom: 12px;
             display: none;
         }
-
-        .sidebar-account-title {
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
+        .status-banner.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+        .status-banner.success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--success);
+            color: var(--success);
+            display: block;
+        }
+        .d-flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header {
             color: #a0a0ff;
-            margin-bottom: 4px;
-            white-space: nowrap;
-        }
-
-        /* Individual account row cards inside the sidebar */
-        .account-card {
-            background: rgba(0,0,0,0.2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 8px 9px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            transition: border-color 0.18s ease;
-        }
-
-        .account-card.is-active {
-            border-color: var(--border-focus);
-            background: rgba(163, 100, 255, 0.08);
-        }
-
-        .account-card .acct-name {
-            font-size: 11px;
             font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .account-card .acct-meta {
-            font-size: 9px;
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Rebuilt Tab 2 Styles: Split Panel Dashboard & Timeline */
-        .split-layout {
-            display: grid;
-            grid-template-columns: 6.2fr 3.8fr;
-            gap: 20px;
-            width: 100%;
-            margin-top: 10px;
-        }
-        
-        .split-left {
-            width: 100%;
-        }
-        
-        .split-right {
-            width: 100%;
-        }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
+            font-size: 0.85em;
             margin-bottom: 15px;
-            flex-shrink: 0;
+            text-transform: uppercase;
         }
-        
-        .summary-card {
-            background: var(--bg-glass);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: var(--transition);
-        }
-        
-        .summary-card:hover {
-            border-color: var(--border-focus);
-            background: rgba(30, 36, 45, 0.5);
-        }
-        
-        .summary-icon {
-            font-size: 22px;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: var(--radius-sm);
-            background: rgba(255, 255, 255, 0.05);
-            flex-shrink: 0;
-        }
-        
-        .summary-info {
+        .content-scroll-area {
+            overflow-y: auto;
+            height: calc(100vh - 40px);
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            min-width: 0;
-        }
-        
-        .summary-info .stat-label {
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .summary-info .stat-val {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .interactive-table tbody tr {
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        
-        .interactive-table tbody tr:hover {
-            background: rgba(255, 255, 255, 0.03);
-        }
-        
-        .interactive-table tbody tr.selected-row {
-            background: rgba(163, 100, 255, 0.08) !important;
-            border-left: 3px solid var(--accent);
-        }
-
-        .timeline-wrapper {
-            position: relative;
-            padding: 10px 0 20px 20px;
-            margin-left: 15px;
-            border-left: 2px solid var(--border);
-            overflow-y: auto;
             flex-grow: 1;
-            min-height: 0;
-        }
-        
-        .timeline-node {
-            position: relative;
-            margin-bottom: 18px;
-            padding-left: 10px;
-        }
-        
-        .timeline-node::before {
-            content: '';
-            position: absolute;
-            left: -27px;
-            top: 2px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--border);
-            border: 2px solid var(--bg-secondary);
-            box-shadow: 0 0 0 2px var(--border);
-            transition: var(--transition);
-        }
-        
-        .timeline-node.node-start::before { background: var(--success); box-shadow: 0 0 6px var(--success); }
-        .timeline-node.node-switch::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-        .timeline-node.node-success::before { background: #2ecc71; }
-        .timeline-node.node-refused::before { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
-        .timeline-node.node-reset::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
-        .timeline-node.node-stop::before { background: #95a5a6; }
-        
-        .timeline-node .node-time {
-            font-size: 9px;
-            font-family: var(--font-mono);
-            color: var(--text-muted);
-            margin-bottom: 2px;
-        }
-        
-        .timeline-node .node-header {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 2px;
-        }
-        
-        .timeline-node .node-body {
-            font-size: 10px;
-            color: var(--text-muted);
-            line-height: 1.4;
         }
     </style>
-
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar (includes Account Status when on this page) -->
-        <div class="sidebar" style="overflow-y: auto; display: flex; flex-direction: column;">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
             <a href="setup.html" class="nav-item">
                 ⚙️ Setup
             </a>
@@ -394,1643 +131,98 @@
             <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
                 📂 Open Download Folder
             </a>
-
-            <!-- ── Account Status (Account Health page only) ─────── -->
-            <div class="sidebar-account-panel" id="accountSidePanel">
-                <div class="sidebar-account-title">👥 Account Status</div>
-                <div id="accountStatusList" style="display:flex; flex-direction:column; gap:6px;">
-                    <span style="font-size:11px; color:var(--text-muted);">Loading...</span>
-                </div>
-
-                <!-- Custom log indicator -->
-                <div id="customLogCard" style="display:none; margin-top:8px; padding:10px; background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:var(--radius-sm);">
-                    <div style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:#a0a0ff; margin-bottom:6px;">📂 Log Source</div>
-                    <div id="customLogPathLabel" style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); word-break:break-all; line-height:1.4; margin-bottom:8px;"></div>
-                    <button class="btn btn-danger w-100" style="font-size:11px; padding:5px 8px;" onclick="clearCustomLog()">🗑️ Restore Default</button>
-                </div>
-            </div>
         </div>
 
         <!-- Main Content -->
         <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
-            <!-- Top Status Bar -->
-            <div class="grid-2 mb-24" style="flex-shrink: 0;">
-                <!-- Browser Status -->
-                <div class="d-flex align-center justify-between glass" id="browserStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
-                    <div class="d-flex align-center gap-8">
-                        <span id="engineStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">ENGINE OFF</span>
-                        <span id="browserStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">BROWSER OFFLINE</span>
-                    </div>
-                    <div><span class="font-weight-600">Log in:</span> <span id="browserAccountText" class="text-muted">Not Ready</span></div>
-                </div>
-                
-                <!-- Automation Stats -->
-                <div class="d-flex align-center glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
-                    <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span><span id="newImagesBadge" class="new-images-badge" style="display: none;" title="Click to clear" onclick="resetNewImagesBadge()">+0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
-                </div>
-            </div>
+            <div class="content-scroll-area">
+                <!-- Status Div -->
+                <div id="statusBanner" class="status-banner"></div>
 
-            <!-- Tab Headers -->
-            <div class="tabs-header mb-20" style="flex-shrink: 0;">
-                <button class="tab-btn active" data-tab="tab-analysis" onclick="switchTab('tab-analysis')">Account Health Analysis</button>
-                <button class="tab-btn" data-tab="tab-management" onclick="switchTab('tab-management')">Automation Cycle Management</button>
-                <button class="tab-btn" data-tab="tab-insights" onclick="switchTab('tab-insights')">Cycle Performance Insights</button>
-                <button class="tab-btn" data-tab="tab-credentials" onclick="switchTab('tab-credentials')">Account Credentials</button>
-            </div>
-            
-            <!-- Tab Contents Container -->
-            <div class="flex-grow-1" style="position: relative; overflow: hidden; min-height: 0;">
-                
-                <!-- Tab 1: Account Health Analysis -->
-                <div id="tab-analysis" class="tab-content active">
-                    <div class="health-grid" style="height: 100%;">
-                        <!-- Left Column: Controls & Visualizer -->
-                        <div class="d-flex flex-column" style="min-height: 0; height: 100%;">
-                            
-                            <!-- Control Panel -->
-                            <div class="card glass mb-15 p-15" style="flex-shrink: 0;">
-                                <div class="d-flex align-center gap-15 justify-between">
-                                    <div class="form-group mb-0 flex-grow-1" style="max-width: 300px;">
-                                        <label class="form-label">Select View Mode</label>
-                                        <select class="form-control" id="viewModeSelect" onchange="onViewModeChange()">
-                                            <option value="Full Loading History (All Events)">Full Loading History (All Events)</option>
-                                            <option value="Detailed History: Active Account">Detailed History: Active Account</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <div class="d-flex align-center gap-10" style="margin-top: 15px;">
-                                        <button class="btn" id="toggleViewBtn" onclick="toggleChartView()">📋 Show Table</button>
-                                        <button class="btn" onclick="triggerLoadRecord()" title="Load Record">📂 Load Record</button>
-                                    </div>
-                                </div>
+                <!-- Controls Card -->
+                <div class="card glass controls-card">
+                    <div class="controls-row d-flex-between">
+                        <div class="d-flex gap-15 align-center flex-wrap">
+                            <div class="control-group">
+                                <label class="text-small text-muted" for="dateFrom">From:</label>
+                                <input type="date" class="form-control" id="dateFrom">
                             </div>
-                            
-                            <!-- Graph Settings Card (shown only in chart mode) -->
-                            <div class="card glass mb-15 p-15" id="graphSettingsCard" style="flex-shrink: 0;">
-                                <div class="settings-grid">
-                                    <!-- Column 1: Event Limit Slider & Show Last Cycle -->
-                                    <div class="card p-10 mb-0" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border);">
-                                        <div class="form-group mb-10">
-                                            <label class="form-label">Show Last N Events</label>
-                                            <div class="slider-container">
-                                                <input type="range" class="w-100" id="lastNEvents" min="10" max="100" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onGraphSettingChange()">
-                                                <span class="slider-val" id="lastNEventsVal">100</span>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex align-center justify-between">
-                                            <span class="text-small text-muted" title="Limit events to the most recent automation cycle only.">Show Last Cycle Only</span>
-                                            <label class="switch">
-                                                <input type="checkbox" id="lastCycleOnlyToggle" onchange="onGraphSettingChange()">
-                                                <span class="slider"></span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Column 2: Graph Mode & Event Success -->
-                                    <div class="card p-10 mb-0" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border);">
-                                        <label class="form-label mb-5">Graph Mode</label>
-                                        <div class="d-flex flex-column gap-6 mb-10">
-                                            <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                <input type="radio" name="graphMode" value="Round Duration" checked onchange="onGraphModeChange()"> Round Duration
-                                            </label>
-                                            <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                <input type="radio" name="graphMode" value="Retry Analysis" onchange="onGraphModeChange()"> Retry Analysis
-                                            </label>
-                                        </div>
-                                        <div class="d-flex align-center justify-between">
-                                            <span class="text-small text-muted" id="eosLabel" title="ON: Success bars show only the final attempt duration. OFF: Success bars show the cumulative round duration.">Event-Only Success Duration</span>
-                                            <label class="switch">
-                                                <input type="checkbox" id="eosToggle" onchange="onGraphSettingChange()">
-                                                <span class="slider"></span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Column 3: Y-Axis Scale -->
-                                    <div class="card p-10 mb-0" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border);">
-                                        <label class="form-label mb-5">Y-Axis Scale</label>
-                                        <div class="d-flex flex-column gap-10">
-                                            <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                <input type="radio" name="yScale" value="linear" checked onchange="onGraphSettingChange()"> Linear
-                                            </label>
-                                            <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                <input type="radio" name="yScale" value="logarithmic" onchange="onGraphSettingChange()"> Logarithmic
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="control-group">
+                                <label class="text-small text-muted" for="dateTo">To:</label>
+                                <input type="date" class="form-control" id="dateTo">
                             </div>
-                            
-                            <!-- Graph View Container -->
-                            <div class="chart-container flex-grow-1" id="chartViewContainer" style="min-height: 0;">
-                                <canvas id="healthChart"></canvas>
+                            <div class="control-group">
+                                <label class="text-small text-muted" for="accountFilter">Account:</label>
+                                <select class="form-control" id="accountFilter">
+                                    <option value="">All accounts</option>
+                                </select>
                             </div>
-                            
-                            <!-- Table View Container -->
-                            <div class="table-container flex-grow-1 hidden" id="tableViewContainer" style="min-height: 0;">
-                                <table class="health-table" id="healthDataTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Seq</th>
-                                            <th>Round</th>
-                                            <th>Account</th>
-                                            <th>Time</th>
-                                            <th>Duration</th>
-                                            <th>Filename</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="healthTableBody">
-                                        <!-- Table rows populated dynamically -->
-                                    </tbody>
-                                </table>
-                            </div>
+                            <button class="btn btn-primary" onclick="loadAllData()">Refresh</button>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Tab 2: Automation Cycle Management -->
-                <div id="tab-management" class="tab-content" style="padding: 15px; box-sizing: border-box;">
-                    <!-- Summary Statistics Grid -->
-                    <div class="summary-grid">
-                        <div class="summary-card">
-                            <div class="summary-icon">🔄</div>
-                            <div class="summary-info">
-                                <span class="stat-label">Total Cycles</span>
-                                <span class="stat-val" id="summaryTotalCycles">0</span>
-                            </div>
-                        </div>
-                        <div class="summary-card">
-                            <div class="summary-icon">✅</div>
-                            <div class="summary-info">
-                                <span class="stat-label">Successful Images</span>
-                                <span class="stat-val" id="summaryTotalImages">0</span>
-                            </div>
-                        </div>
-                        <div class="summary-card">
-                            <div class="summary-icon">⚠️</div>
-                            <div class="summary-info">
-                                <span class="stat-label">AI Refusals</span>
-                                <span class="stat-val" id="summaryTotalRefusals">0</span>
-                            </div>
-                        </div>
-                        <div class="summary-card">
-                            <div class="summary-icon">🔌</div>
-                            <div class="summary-info">
-                                <span class="stat-label">Safety Resets</span>
-                                <span class="stat-val" id="summaryTotalResets">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Split Layout -->
-                    <div class="split-layout">
-                        <!-- Left Column: Cycle Table List -->
-                        <div class="split-left">
-                            <div class="card glass mb-15 p-15" style="display: flex; flex-direction: column;">
-                                <div class="d-flex align-center justify-between mb-15" style="flex-shrink: 0;">
-                                    <div>
-                                        <h3 class="m-0" style="font-size: 14px; font-weight: 600;">Automation Cycles List</h3>
-                                        <p class="text-muted text-small mb-0">Select a row to inspect its chronological timeline on the right.</p>
-                                    </div>
-                                    <button class="btn" onclick="fetchTab2Data(true)" title="Refresh Log Data">🔄 Refresh</button>
-                                </div>
-                                
-                                <div class="table-container interactive-table" id="tab2TableViewContainer" style="max-height: 480px; height: auto; margin-bottom: 0; overflow-y: auto;">
-                                    <table class="health-table" id="managementDataTable">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 40px; text-align: center;">
-                                                    <input type="checkbox" id="tab2SelectAll" onchange="toggleTab2SelectAll(this)">
-                                                </th>
-                                                <th style="width: 80px;">Cycle ID</th>
-                                                <th>Start Time</th>
-                                                <th>Duration</th>
-                                                <th>Images</th>
-                                                <th>Refused</th>
-                                                <th>Reset</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="managementTableBody">
-                                            <!-- Dynamically populated rows -->
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- Actions Panel (Hidden by default, shown when cycles are selected) -->
-                            <div class="card glass p-15 hidden" id="tab2ActionsPanel">
-                                <div class="d-flex align-center justify-between">
-                                    <span class="text-small font-weight-600 text-danger" id="tab2SelectedWarningLabel">Selected 0 cycle(s).</span>
-                                    <div class="d-flex align-center gap-10">
-                                        <button class="btn btn-danger" onclick="deleteSelectedCycles(event)">🗑️ Delete Selected Cycles</button>
-                                        <button class="btn btn-primary" onclick="saveSelectedCycles(event)">💾 Save Record</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Right Column: Timeline Detail Panel -->
-                        <div class="split-right">
-                            <div class="card glass p-15 hidden" id="cycleDetailCard" style="min-height: 540px; display: flex; flex-direction: column;">
-                                <!-- Placeholder state (empty placeholder to avoid JS crash) -->
-                                <div id="timelinePlaceholder" class="hidden"></div>
-                                
-                                <!-- Timeline details content (hidden by default) -->
-                                <div id="timelineDetailContent" class="hidden d-flex flex-column" style="height: 100%; flex-grow: 1;">
-                                    <div class="d-flex align-center justify-between mb-15 pb-10" style="border-bottom: 1px solid var(--border);">
-                                        <div>
-                                            <h3 class="m-0" id="timelineTitle" style="font-size: 15px; font-weight: 600;">Cycle Details</h3>
-                                            <span id="timelineStatusBadge" class="status-badge mt-5" style="display: inline-block;">Completed</span>
-                                        </div>
-                                        <div class="d-flex gap-8">
-                                            <button class="btn btn-danger" id="btnDeleteCurrentCycle" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
-                                            <button class="btn" id="btnExportCurrentCycle" style="padding: 6px 12px; font-size: 12px;">💾 Export</button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Info cards using grid-2 -->
-                                    <div class="grid-2 gap-10 mb-15" style="flex-shrink: 0;">
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
-                                            <span class="text-muted text-small">Start Time</span>
-                                            <span class="text-small font-weight-500" id="timelineStartVal" style="font-family: var(--font-mono);">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
-                                            <span class="text-muted text-small">Stop Time</span>
-                                            <span class="text-small font-weight-500" id="timelineStopVal" style="font-family: var(--font-mono);">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
-                                            <span class="text-muted text-small">Duration</span>
-                                            <span class="text-small font-weight-500" id="timelineDurationVal">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
-                                            <span class="text-muted text-small">Log Lines</span>
-                                            <span class="text-small font-weight-500" id="timelineLinesVal">-</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Timeline container -->
-                                    <div style="flex-grow: 1; position: relative; min-height: 380px;">
-                                        <div class="timeline-wrapper" id="timelineNodesContainer" style="position: absolute; inset: 0; max-height: 380px; overflow-y: auto;">
-                                            <!-- Chronological nodes -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="d-flex gap-10 align-center">
+                            <label class="text-small text-muted" for="clearDate">Older than:</label>
+                            <input type="date" class="form-control" id="clearDate">
+                            <button class="btn btn-danger" onclick="clearOldData()">Clear</button>
                         </div>
                     </div>
                 </div>
 
+                <!-- Charts Layout -->
+                <div class="health-grid">
+                    <!-- Chart 1: Grouped Bar Chart -->
+                    <div class="card glass chart-card">
+                        <div class="card-header">📊 Aggregates per Account</div>
+                        <div class="chart-container">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
 
-                <!-- Tab 3: Cycle Performance Insights -->
-                <div id="tab-insights" class="tab-content" style="height: 100%; min-height: 0;">
-                    <div class="health-grid" style="height: 100%; min-height: 0;">
-                        <div class="d-flex flex-column" style="min-height: 0; height: 100%;">
-                            
-                            <!-- Control Panel -->
-                            <div class="card glass mb-15 p-15" style="flex-shrink: 0;">
-                                <div class="d-flex align-center gap-15 justify-between">
-                                    <div class="d-flex align-center gap-15 flex-grow-1">
-                                        <div class="form-group mb-0" style="max-width: 250px; flex-grow: 1;">
-                                            <label class="form-label">Select Cycle</label>
-                                            <select class="form-control" id="tab3CycleSelect" onchange="onTab3CycleChange()"></select>
-                                        </div>
-                                        <div class="form-group mb-0" style="max-width: 220px; flex-grow: 1;">
-                                            <label class="form-label">Y-Axis Metric</label>
-                                            <div class="d-flex align-center gap-10" style="height: 38px;">
-                                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                    <input type="radio" name="tab3YAxis" value="Duration" checked onchange="onTab3YAxisChange()"> Duration
-                                                </label>
-                                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
-                                                    <input type="radio" name="tab3YAxis" value="Images Download" onchange="onTab3YAxisChange()"> Images
-                                                </label>
-                                            </div>
-                                        </div>
-                                        <div class="form-group mb-0 flex-grow-1" id="tab3SliderGroup" style="max-width: 300px;">
-                                            <label class="form-label">Show Last N Accounts</label>
-                                            <div class="slider-container">
-                                                <input type="range" class="w-100" id="tab3NAccounts" min="1" max="10" step="1" value="10" oninput="updateTab3SliderVal(this.value)" onchange="onTab3SliderChange()">
-                                                <span class="slider-val" id="tab3NAccountsVal">10</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="d-flex align-center gap-10" style="margin-top: 15px;">
-                                        <button class="btn" onclick="fetchTab3Data(true)" title="Refresh">🔄 Refresh</button>
-                                        <button class="btn" onclick="triggerLoadRecord()" title="Load Record">📂 Load Record</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Graph View Container -->
-                            <div class="chart-container flex-grow-1" id="tab3ChartViewContainer" style="min-height: 0; display: flex; flex-direction: column;">
-                                <div style="flex-grow: 1; position: relative; min-height: 0;">
-                                    <canvas id="insightsChart"></canvas>
-                                </div>
-                                <!-- Premium color legend underneath the chart container -->
-                                <div class="d-flex justify-center align-center gap-20 mt-10 text-small text-muted" style="justify-content: center; width: 100%; flex-wrap: wrap;">
-                                    <div class="d-flex align-center gap-8">
-                                        <span style="display:inline-block; width:12px; height:12px; background-color:#4f8bf9; border-radius:3px;"></span> No Image (Base)
-                                    </div>
-                                    <div class="d-flex align-center gap-8">
-                                        <span style="display:inline-block; width:12px; height:12px; background-color:#a0c0ff; border-radius:3px;"></span> No Image (Light)
-                                    </div>
-                                    <div class="d-flex align-center gap-8">
-                                        <span style="display:inline-block; width:12px; height:12px; background-color:#2ecc71; border-radius:3px;"></span> With Image (Base)
-                                    </div>
-                                    <div class="d-flex align-center gap-8">
-                                        <span style="display:inline-block; width:12px; height:12px; background-color:#a0e6b5; border-radius:3px;"></span> With Image (Light)
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Table View Container -->
-                            <div class="table-container" id="tab3TableViewContainer" style="height: 220px; flex-shrink: 0; overflow-y: auto; margin-bottom: 0;">
-                                <table class="health-table" id="insightsDataTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Seq</th>
-                                            <th>Account</th>
-                                            <th>Duration</th>
-                                            <th>Events</th>
-                                            <th>Images</th>
-                                            <th>Refused</th>
-                                            <th>Reset</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="insightsTableBody">
-                                        <!-- Table rows populated dynamically -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            
+                    <!-- Chart 2: Success Duration Line Chart -->
+                    <div class="card glass chart-card">
+                        <div class="card-header">📈 Success Cycle Durations</div>
+                        <div class="chart-container">
+                            <canvas id="lineChart"></canvas>
                         </div>
                     </div>
                 </div>
-                
 
-
-                <!-- Tab 5: Account Credentials -->
-                <div id="tab-credentials" class="tab-content" style="padding: 15px; box-sizing: border-box;">
-                    <!-- Row 1: Account Settings & Quick Operations -->
-                    <div class="grid-2 mb-20">
-                        <!-- Card 1: Account Settings -->
-                        <div class="card glass mb-0 p-15" style="display: flex; flex-direction: column; justify-content: space-between;">
-                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 12px; text-transform: uppercase;">User Login Settings</div>
-                            <div class="d-flex align-center gap-15 flex-wrap" style="align-items: flex-end;">
-                                <div class="form-group mb-0" style="flex-grow: 1; max-width: 250px; min-width: 150px;">
-                                    <label class="form-label" for="activeAccountSelect">Active Account</label>
-                                    <select class="form-control" id="activeAccountSelect">
-                                        <option value="">No accounts</option>
-                                    </select>
-                                </div>
-                                <button class="btn btn-primary" id="setActiveAccountBtn" onclick="onSetActiveAccount()" style="height: 38px;">🔒 Set Active</button>
-                                <div class="d-flex align-center gap-8 mb-8" style="user-select: none;">
-                                    <label class="switch">
-                                        <input type="checkbox" id="bypassQuotaFullToggle" onchange="onToggleBypassQuotaFull()">
-                                        <span class="slider"></span>
-                                    </label>
-                                    <span class="text-small text-muted" title="Bypass Quota Full constraint during account switches.">Bypass Quota Full</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Card 2: Operations -->
-                        <div class="card glass mb-0 p-15">
-                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 12px; text-transform: uppercase;">Quick Operations</div>
-                            <div class="d-flex align-center gap-10 flex-wrap" style="height: calc(100% - 24px); align-content: center;">
-                                <button class="btn" onclick="reloadCredentialsTable()" title="Reload from disk">🔄 Reload Table</button>
-                                <button class="btn btn-danger" onclick="clearQuotaColumn()" title="Clear quota full timestamps" style="background: rgba(220,53,69,0.15); border-color: rgba(220,53,69,0.3); color: #ff7b72;">🧹 Clear Quota Full</button>
-                                <button class="btn" onclick="clearSwitchedColumn()" title="Clear last switched timestamp">🧹 Clear Switched At</button>
-                                <button class="btn" onclick="resetStatsColumn()" title="Reset session stats to empty">🧹 Reset Stats</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Card 3: Credentials Table -->
-                    <div class="card glass p-15" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 0; margin-bottom: 0;">
-                        <div class="d-flex align-center justify-between mb-15">
-                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase;">Credentials List</div>
-                            <div id="credentialsTableStatus" class="text-small text-success font-weight-600"></div>
-                        </div>
-
-                        <div class="table-container" style="flex-grow: 1; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin-bottom: 15px; background: rgba(0, 0, 0, 0.15);">
-                            <table class="health-table" id="credentialsTable" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 70px; text-align: center;">Active</th>
-                                        <th style="width: 70px; text-align: center;">Bypass</th>
-                                        <th style="width: 160px;">Username</th>
-                                        <th style="width: 100px; text-align: center;">Auto Delete</th>
-                                        <th style="width: 110px;">Range</th>
-                                        <th style="width: 140px;">Quota Full At</th>
-                                        <th style="width: 140px;">Switched At</th>
-                                        <th style="width: 65px; text-align: center;">Images</th>
-                                        <th style="width: 65px; text-align: center;">Refused</th>
-                                        <th style="width: 65px; text-align: center;">Resets</th>
-                                        <th style="width: 50px; text-align: center;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="credentialsTableBody">
-                                    <!-- Populated dynamically -->
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="d-flex justify-between align-center">
-                            <button class="btn" onclick="addCredentialsRow()">➕ Add Account</button>
-                            <button class="btn btn-primary" onclick="saveCredentialsChanges()">💾 Save Table Changes</button>
-                        </div>
+                <!-- Runs Card -->
+                <div class="card glass runs-card">
+                    <div class="card-header">🏃‍♂️ Recent Automation Runs</div>
+                    <div class="table-scroll">
+                        <table class="health-table">
+                            <thead>
+                                <tr>
+                                    <th>Run ID</th>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Accounts</th>
+                                    <th>Successes</th>
+                                    <th>Refusals</th>
+                                    <th>Resets</th>
+                                    <th>Quota Hits</th>
+                                </tr>
+                            </thead>
+                            <tbody id="runsTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
             </div>
         </div>
     </div>
 
-    <!-- Chart.js (local bundle) -->
+    <!-- Script Integrations -->
     <script src="js/chart.min.js"></script>
     <script src="js/api.js"></script>
     <script>
-        // ── DIAGNOSTIC OVERLAY ──────────────────────────────────────────────
-        (function() {
-            // Wait for DOM to be ready to insert
-            function initOverlay() {
-                const errDiv = document.createElement('div');
-                errDiv.id = 'diagnostic-overlay';
-                errDiv.style.cssText = 'position: fixed; top: 10px; right: 10px; width: 450px; max-height: 400px; overflow-y: auto; background: rgba(20, 10, 10, 0.95); color: #ff5555; border: 2px solid #ff3333; border-radius: 8px; padding: 12px; font-family: var(--font-mono); font-size: 11px; z-index: 999999; display: none; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);';
-                
-                const header = document.createElement('div');
-                header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 0, 0, 0.3); padding-bottom: 6px; margin-bottom: 8px;';
-                header.innerHTML = '<span style="font-weight: bold; color: #ff9999;">⚠️ JS Errors/Console Captured</span>';
-                
-                const closeBtn = document.createElement('button');
-                closeBtn.textContent = '❌';
-                closeBtn.style.cssText = 'background: transparent; border: none; color: #ff9999; cursor: pointer; font-size: 12px;';
-                closeBtn.onclick = () => { errDiv.style.display = 'none'; };
-                header.appendChild(closeBtn);
-                errDiv.appendChild(header);
-                
-                const logContent = document.createElement('div');
-                logContent.id = 'diagnostic-content';
-                errDiv.appendChild(logContent);
-                
-                document.body.appendChild(errDiv);
-                
-                window._showErr = function(msg, stack = '', type = 'Error') {
-                    errDiv.style.display = 'block';
-                    const p = document.createElement('p');
-                    p.style.margin = '4px 0';
-                    p.style.borderBottom = '1px solid rgba(255,0,0,0.1)';
-                    p.style.paddingBottom = '4px';
-                    p.style.whiteSpace = 'pre-wrap';
-                    p.style.wordBreak = 'break-all';
-                    p.innerHTML = `<strong style="color: #ff9999;">[${type}]</strong> ${msg} <br><small style="color: #ffcccc;">${stack}</small>`;
-                    logContent.appendChild(p);
-                    errDiv.scrollTop = errDiv.scrollHeight;
-                };
-            }
-            if (document.body) {
-                initOverlay();
-            } else {
-                document.addEventListener('DOMContentLoaded', initOverlay);
-            }
-            
-            window.onerror = function(message, source, lineno, colno, error) {
-                if (window._showErr) {
-                    window._showErr(message, error && error.stack ? error.stack : `at ${source}:${lineno}:${colno}`);
-                } else {
-                    alert('Early JS Error: ' + message);
-                }
-                return false;
-            };
-            
-            window.onunhandledrejection = function(event) {
-                const r = event.reason;
-                const msg = r ? r.message || r : 'Unhandled Rejection';
-                const stack = r && r.stack ? r.stack : '';
-                if (window._showErr) {
-                    window._showErr(msg, stack, 'PromiseRejection');
-                } else {
-                    alert('Early Promise Rejection: ' + msg);
-                }
-            };
-            
-            const origError = console.error;
-            console.error = function(...args) {
-                origError.apply(console, args);
-                const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-                if (window._showErr) {
-                    window._showErr(msg, '', 'console.error');
-                }
-            };
-        })();
-        // ──────────────────────────────────────────────────────────────────
+        let barChartInstance = null;
+        let lineChartInstance = null;
 
-        let rawEvents = [];
-        let customLogPath = null;
-        let showTableMode = false;
-        let lastKnownCycles = -1;   // round-end detection
-        let _lastN = 100;           // canonical "Show Last N Events" value
-        let myChart = null;
-
-        let baseSuccesses = null;
-
-        function resetNewImagesBadge() {
-            const statImages = document.getElementById('statImages');
-            const currentSuccesses = statImages ? parseInt(statImages.textContent, 10) || 0 : 0;
-            baseSuccesses = currentSuccesses;
-            localStorage.setItem('setup_cleared_successes', baseSuccesses);
-            const badge = document.getElementById('newImagesBadge');
-            if (badge) {
-                badge.style.display = 'none';
-                badge.textContent = '+0';
-            }
-        }
-
-        // Tab 2 – Automation Cycle Management state (declared here so all functions can safely reference them)
-        let tab2Cycles = [];
-        let isTab2Loading = false;
-        let tab2SelectedCycleIdx = -1;
-
-        // On document load
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Restore visual preferences from persistent config
-            await loadPreferences();
-            
-            // Populate profile items in view mode select dropdown
-            await populateViewModeSelect();
-            
-            // Initial data pull
-            await fetchHealthData();
-            
-            // Set up polling for status headers (every 3 seconds)
-            updateStatusHeader();
-            setInterval(updateStatusHeader, 3000);
-            
-            // Round-end refresh is handled inside updateStatusHeader() poll
-        });
-
-        // Load config preferences
-        async function loadPreferences() {
-            try {
-                const config = await api.getConfig();
-                
-                // View Mode
-                if (config.health_view_mode) {
-                    document.getElementById('viewModeSelect').value = config.health_view_mode;
-                }
-                
-                // Show Last N Events Slider
-                if (config.health_n_rounds) {
-                    _lastN = parseInt(config.health_n_rounds);
-                    document.getElementById('lastNEvents').value = _lastN;
-                    updateSliderVal(_lastN);
-                }
-                if (config.health_n_rounds_retry) {
-                    // Cache retry events size internally but slider uses current graph type
-                }
-                
-                // Last cycle setting
-                document.getElementById('lastCycleOnlyToggle').checked = !!config.health_show_last_cycle;
-                
-                // Event-only success toggle
-                document.getElementById('eosToggle').checked = !!config.health_event_only_success;
-                
-                
-                // Graph type preference
-                const graphType = config.health_graph_type || 'Round Duration';
-                const typeRadio = document.querySelector(`input[name="graphMode"][value="${graphType}"]`);
-                if (typeRadio) {
-                    typeRadio.checked = true;
-                }
-                
-                // Y-Axis scale preference
-                const scaleVal = (config.health_y_scale || 'Linear').toLowerCase();
-                const scaleRadio = document.querySelector(`input[name="yScale"][value="${scaleVal}"]`);
-                if (scaleRadio) {
-                    scaleRadio.checked = true;
-                }
-                
-                onGraphModeChange(); // Align visual disable rules
-            } catch (err) {
-                console.error("Failed to load preferences:", err);
-            }
-        }
-
-        // Switch Tabs
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-
-            const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
-            if (activeBtn) activeBtn.classList.add('active');
-
-            const activeContent = document.getElementById(tabId);
-            if (activeContent) activeContent.classList.add('active');
-
-            // Show side panel only for Account Health Analysis tab
-            const panel = document.getElementById('accountSidePanel');
-            if (panel) {
-                panel.classList.toggle('hidden', tabId !== 'tab-analysis');
-            }
-
-            if (tabId === 'tab-insights') fetchTab3Data();
-            if (tabId === 'tab-management') fetchTab2Data();
-            if (tabId === 'tab-credentials') fetchCredentialsTab();
-        }
-
-
-        // View Mode Populate
-        async function populateViewModeSelect() {
-            try {
-                const response = await api.getProfiles();
-                const profiles = response.profiles;
-                const select = document.getElementById('viewModeSelect');
-                
-                // Keep default two options
-                while (select.options.length > 2) {
-                    select.remove(2);
-                }
-                
-                profiles.forEach(prof => {
-                    const opt = document.createElement('option');
-                    opt.value = `Detailed History: ${prof}`;
-                    opt.textContent = `Detailed History: ${prof}`;
-                    select.appendChild(opt);
-                });
-                
-                // Re-select config view mode if match exists
-                const config = await api.getConfig();
-                if (config.health_view_mode) {
-                    select.value = config.health_view_mode;
-                }
-            } catch (err) {
-                console.error("Failed to populate view mode dropdown:", err);
-            }
-        }
-
-        // View Mode Selector Change
-        async function onViewModeChange() {
-            const val = document.getElementById('viewModeSelect').value;
-            await api.saveConfig({ health_view_mode: val });
-            await fetchHealthData();
-        }
-
-        // Load visual settings on change
-        async function onGraphSettingChange() {
-            const showLastCycle = document.getElementById('lastCycleOnlyToggle').checked;
-            const eos = document.getElementById('eosToggle').checked;
-            const yScale = document.querySelector('input[name="yScale"]:checked').value;
-            const graphMode = document.querySelector('input[name="graphMode"]:checked').value;
-            const isRetry = (graphMode === 'Retry Analysis');
-
-            // _lastN is already up-to-date from updateSliderVal(oninput),
-            // but re-read here as the authoritative value at commit time.
-            _lastN = parseInt(document.getElementById('lastNEvents').value);
-            
-            const updates = {
-                health_show_last_cycle: showLastCycle,
-                health_event_only_success: eos,
-                health_y_scale: yScale.charAt(0).toUpperCase() + yScale.slice(1) // capitalize
-            };
-            
-            if (isRetry) {
-                updates.health_n_rounds_retry = _lastN;
-            } else {
-                updates.health_n_rounds = _lastN;
-            }
-            
-            await api.saveConfig(updates);
-            
-            // Re-render chart dynamically from cache
-            if (rawEvents.length > 0) {
-                await filterAndRenderData(rawEvents);
-            }
-        }
-
-        // Mode switch
-        async function onGraphModeChange() {
-            const graphMode = document.querySelector('input[name="graphMode"]:checked').value;
-            const isRetry = (graphMode === 'Retry Analysis');
-            
-            // Sync graph mode configuration key
-            await api.saveConfig({ health_graph_type: graphMode });
-            
-            // Disable/enable Event-Only Success duration checkbox (only valid for Round Duration)
-            const eosToggle = document.getElementById('eosToggle');
-            const eosLabel = document.getElementById('eosLabel');
-            eosToggle.disabled = isRetry;
-            if (isRetry) {
-                eosLabel.style.opacity = '0.5';
-            } else {
-                eosLabel.style.opacity = '1';
-            }
-            
-            // Re-render from cache
-            if (rawEvents.length > 0) {
-                await filterAndRenderData(rawEvents);
-            }
-        }
-
-        // Toggle Table vs Plot Graph view
-        function toggleChartView() {
-            showTableMode = !showTableMode;
-            const btn = document.getElementById('toggleViewBtn');
-            const settingsCard = document.getElementById('graphSettingsCard');
-            
-            if (showTableMode) {
-                btn.textContent = '📊 Plot Graph';
-                settingsCard.classList.add('hidden');
-            } else {
-                btn.textContent = '📋 Show Table';
-                settingsCard.classList.remove('hidden');
-            }
-            
-            if (rawEvents.length > 0) {
-                filterAndRenderData(rawEvents);
-            }
-        }
-
-        // Update slider display AND canonical _lastN value
-        function updateSliderVal(val) {
-            _lastN = parseInt(val);
-            document.getElementById('lastNEventsVal').textContent = val;
-        }
-
-        function updateSliderMax(totalEvents) {
-            const slider = document.getElementById('lastNEvents');
-            const maxVal = Math.max(20, Math.ceil(totalEvents / 10) * 10);
-            slider.max = maxVal;
-            
-            // Clamp canonical value if it exceeds new max
-            if (_lastN > maxVal) {
-                _lastN = maxVal;
-                slider.value = _lastN;
-                updateSliderVal(_lastN);
-            } else {
-                // Force slider to match canonical value (prevents DOM drift)
-                slider.value = _lastN;
-            }
-        }
-
-
-
-        // Choose custom record file
-        async function triggerLoadRecord() {
-            try {
-                const paths = await window.electronAPI.selectFile({
-                    title: 'Select Log File',
-                    filters: [
-                        { name: 'Log Files', extensions: ['log'] },
-                        { name: 'All Files', extensions: ['*'] }
-                    ],
-                    properties: ['openFile']
-                });
-                
-                if (paths && paths.length > 0) {
-                    customLogPath = paths[0];
-                    
-                    // Show file source card
-                    document.getElementById('customLogCard').style.display = 'block';
-                    document.getElementById('customLogPathLabel').textContent = customLogPath;
-                    
-                    await fetchHealthData();
-                    if (document.getElementById('tab-insights').classList.contains('active')) {
-                        await fetchTab3Data(true);
-                    }
-                    if (document.getElementById('tab-management').classList.contains('active')) {
-                        await fetchTab2Data(true);
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to select log file:", err);
-            }
-        }
-
-        // Restore default path
-        async function clearCustomLog() {
-            customLogPath = null;
-            document.getElementById('customLogCard').style.display = 'none';
-            await fetchHealthData();
-            if (document.getElementById('tab-insights').classList.contains('active')) {
-                await fetchTab3Data(true);
-            }
-            if (document.getElementById('tab-management').classList.contains('active')) {
-                await fetchTab2Data(true);
-            }
-        }
-
-        // Main data fetch routine
-        async function fetchHealthData() {
-            try {
-                const viewMode = document.getElementById('viewModeSelect').value;
-                let targetAccount = 'ALL_EVENTS';
-                
-                if (viewMode === 'Detailed History: Active Account') {
-                    // Detect active account username
-                    const status = await api.getProfilesStatus();
-                    const activeProfile = status.profiles.find(p => p.active);
-                    if (activeProfile) {
-                        targetAccount = activeProfile.username;
-                    } else {
-                        // No active user login found, default or display info
-                        rawEvents = [];
-                        document.getElementById('healthTableBody').innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No active account logged in.</td></tr>';
-                        if (myChart) myChart.destroy();
-                        return;
-                    }
-                } else if (viewMode.startsWith('Detailed History: ')) {
-                    targetAccount = viewMode.replace('Detailed History: ', '');
-                }
-                
-                // Fetch parsing payload
-                const healthData = await api.getAccountHealth(targetAccount, customLogPath);
-                rawEvents = healthData.detailed;
-                
-                // Update right column accounts list summary
-                await updateAccountStatusOverview();
-                
-                // Process filters and plot/table
-                await filterAndRenderData(rawEvents);
-            } catch (err) {
-                console.error("Error fetching account health logs:", err);
-            }
-        }
-
-        // Background filter logic (matches Streamlit fragments logic)
-        async function filterAndRenderData(detailedData) {
-            let filtered = [...detailedData];
-            
-            // 1. Show Last Cycle Only filter
-            const showLastCycle = document.getElementById('lastCycleOnlyToggle').checked;
-            if (showLastCycle) {
-                try {
-                    const cyclesResponse = await api.getAccountCycles(customLogPath);
-                    const cycles = cyclesResponse.cycles;
-                    if (cycles && cycles.length > 0) {
-                        const lastCycle = cycles[cycles.length - 1];
-                        const startIdx = lastCycle.start_idx;
-                        const endIdx = lastCycle.end_idx !== null ? lastCycle.end_idx : Infinity;
-                        
-                        filtered = filtered.filter(item => {
-                            const lineIdx = item.log_line_idx !== undefined ? item.log_line_idx : -1;
-                            return lineIdx >= startIdx && lineIdx <= endIdx;
-                        });
-                    }
-                } catch (err) {
-                    console.error("Failed to filter by last cycle:", err);
-                }
-            }
-            
-            // 2. Set absolute event numbers for sequence alignment
-            const totalEvents = filtered.length;
-            filtered.forEach((item, index) => {
-                item.Absolute_Event_Num = totalEvents - index;
-            });
-            
-            // 3 & 4. Update slider max, then slice using canonical _lastN
-            updateSliderMax(filtered.length);
-            const sliced = filtered.slice(0, _lastN);
-            
-            // 5. Render Chart or Table
-            const isChart = !showTableMode;
-            const graphMode = document.querySelector('input[name="graphMode"]:checked').value;
-            const yScale = document.querySelector('input[name="yScale"]:checked').value;
-            const eos = document.getElementById('eosToggle').checked;
-            
-            if (isChart) {
-                document.getElementById('chartViewContainer').classList.remove('hidden');
-                document.getElementById('tableViewContainer').classList.add('hidden');
-                
-                if (graphMode === 'Round Duration') {
-                    renderChart(sliced, yScale, eos);
-                } else {
-                    const agg = aggregateRetryData(sliced);
-                    renderRetryChart(agg, yScale);
-                }
-            } else {
-                document.getElementById('chartViewContainer').classList.add('hidden');
-                document.getElementById('tableViewContainer').classList.remove('hidden');
-                
-                renderTable(sliced);
-            }
-        }
-
-        // Render Bar Chart for Round Duration
-        function renderChart(data, yScale, eos) {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            if (myChart) {
-                myChart.destroy();
-            }
-            
-            if (!data || data.length === 0) {
-                return;
-            }
-            
-            const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8892b0';
-            
-            // Process data to chronological (oldest to newest)
-            let processedData = [...data].reverse();
-            
-            if (eos) {
-                processedData.forEach(r => {
-                    if (r.status === 'Success' && r.health_self) {
-                        r.durationVal = parseFloat(r.health_self.replace('s', ''));
-                    } else {
-                        r.durationVal = parseFloat(r.health.replace('s', ''));
-                    }
-                });
-            } else {
-                processedData.forEach(r => {
-                    r.durationVal = parseFloat(r.health.replace('s', ''));
-                });
-            }
-            
-            // Determine if maximum duration exceeds 60 seconds
-            const maxDurationSeconds = Math.max(...processedData.map(r => r.durationVal || 0));
-            const useMinutes = maxDurationSeconds > 60;
-            
-            const labels = processedData.map(r => r.Absolute_Event_Num);
-            const yValues = processedData.map(r => {
-                let val = useMinutes ? (r.durationVal / 60.0) : r.durationVal;
-                if (yScale === 'logarithmic' && val <= 0) {
-                    val = 0.01;
-                }
-                return val;
-            });
-            
-            const barColors = processedData.map(r => {
-                if (r.status === 'Success') return '#2ecc71';
-                if (r.status === 'Reject' || r.status === 'Refused') return '#a0a0ff';
-                if (r.status === 'Reset') return '#f39c12';
-                return '#ff9999';
-            });
-            
-            // Alternating backgrounds (session blocks)
-            let seg = 0;
-            let prevSi = null;
-            let prevAcct = null;
-            const alternatingBgs = processedData.map(r => {
-                const si = r.session_index;
-                const acct = (r.account || '').toLowerCase();
-                if (prevSi !== null && (si !== prevSi || acct !== prevAcct)) {
-                    seg++;
-                }
-                prevSi = si;
-                prevAcct = acct;
-                return seg % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)';
-            });
-
-            const dataset = {
-                data: yValues,
-                backgroundColor: barColors,
-                borderWidth: 0,
-                borderRadius: 4
-            };
-            
-            const sessionBackgroundPlugin = {
-                id: 'sessionBackgrounds',
-                beforeDraw(chart) {
-                    const { ctx, chartArea } = chart;
-                    ctx.save();
-                    
-                    const meta = chart.getDatasetMeta(0);
-                    processedData.forEach((r, index) => {
-                        const model = meta.data[index];
-                        if (!model) return;
-                        
-                        const prevModel = meta.data[index - 1];
-                        const nextModel = meta.data[index + 1];
-                        
-                        const left = (index === 0 || !prevModel) ? chartArea.left : (prevModel.x + model.x) / 2;
-                        const right = (index === processedData.length - 1 || !nextModel) ? chartArea.right : (model.x + nextModel.x) / 2;
-                        
-                        ctx.fillStyle = alternatingBgs[index];
-                        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
-                    });
-                    ctx.restore();
-                }
-            };
-
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [dataset]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: 'Sequence',
-                                color: textMuted
-                            },
-                            ticks: { display: false }
-                        },
-                        y: {
-                            type: yScale,
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: useMinutes ? 'Duration (minutes)' : 'Duration (seconds)',
-                                color: textMuted
-                            },
-                            ticks: {
-                                color: textMuted,
-                                callback: function(value, index) {
-                                    // Only show integer values
-                                    if (value % 1 !== 0) return;
-                                    // In log mode alternate visibility to avoid crowding
-                                    if (yScale === 'logarithmic') {
-                                        return index % 2 === 0 ? value : '';
-                                    }
-                                    return value;
-                                }
-                            },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                title: (tooltipItems) => {
-                                    const index = tooltipItems[0].dataIndex;
-                                    const record = processedData[index];
-                                    return `Sequence: ${record.Absolute_Event_Num}`;
-                                },
-                                label: (tooltipItem) => {
-                                    const index = tooltipItem.dataIndex;
-                                    const record = processedData[index];
-                                    const lines = [
-                                        `Time: ${record.time || 'N/A'}`,
-                                        `Account: ${record.account || 'N/A'}`,
-                                        `Duration: ${record.health || '0s'}`,
-                                        `Status: ${record.status || 'N/A'}`
-                                    ];
-                                    if (record.filename) {
-                                        lines.push(`Filename: ${record.filename}`);
-                                    }
-                                    return lines;
-                                }
-                            }
-                        }
-                    }
-                },
-                plugins: [sessionBackgroundPlugin]
-            });
-            setupChartInteraction(myChart, labels);
-        }
-
-        // Aggregate raw detailed rows into Retry segments (Line chart)
-        function aggregateRetryData(detailedData) {
-            const aggData = [];
-            let currRej = 0;
-            let currRes = 0;
-            let currDur = 0.0;
-            let segId = 0;
-            let prevSi = null;
-            let prevAcct = null;
-            
-            // Oldest to newest traversal
-            const reversedData = [...detailedData].reverse();
-            
-            reversedData.forEach(row => {
-                const si = row.session_index;
-                const acct = (row.account || '').toLowerCase();
-                if (prevSi !== null && (si !== prevSi || acct !== prevAcct)) {
-                    currRej = 0;
-                    currRes = 0;
-                    currDur = 0.0;
-                    segId++;
-                }
-                
-                const rowDur = parseFloat(row.health.replace('s', ''));
-                
-                if (row.status === 'Reject' || row.status === 'Refused') {
-                    currRej++;
-                    currDur += rowDur;
-                } else if (row.status === 'Reset') {
-                    currRes++;
-                    currDur += rowDur;
-                } else if (row.status === 'Success' || row.status === 'Fail') {
-                    const d = { ...row };
-                    if ('true_rej' in d) {
-                        d.Rejects = d.true_rej;
-                        d.Resets = d.true_res;
-                        d.Duration = rowDur;
-                    } else {
-                        d.Rejects = currRej;
-                        d.Resets = currRes;
-                        d.Duration = currDur + rowDur;
-                    }
-                    d.Image = d.filename ? d.filename.replace('.png', '') : 'FAILED';
-                    d.seg_id = segId;
-                    aggData.push(d);
-                    
-                    currRej = 0;
-                    currRes = 0;
-                    currDur = 0.0;
-                }
-                
-                prevSi = si;
-                prevAcct = acct;
-            });
-            
-            return aggData;
-        }
-
-        // Render line chart for Retry Analysis
-        function renderRetryChart(aggData, yScale) {
-            const ctx = document.getElementById('healthChart').getContext('2d');
-            if (myChart) {
-                myChart.destroy();
-            }
-            
-            if (!aggData || aggData.length === 0) {
-                return;
-            }
-            
-            const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8892b0';
-            const textMain = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#e2e8f0';
-            
-            // Determine if maximum duration exceeds 60 seconds
-            const maxDurationSeconds = Math.max(...aggData.map(d => d.Duration || 0));
-            const useMinutes = maxDurationSeconds > 60;
-            
-            const labels = aggData.map(d => d.Absolute_Event_Num);
-            const durations = aggData.map(d => {
-                let val = useMinutes ? (d.Duration / 60.0) : d.Duration;
-                if (yScale === 'logarithmic' && val <= 0) {
-                    val = 0.01;
-                }
-                return val;
-            });
-            const rejects = aggData.map(d => d.Rejects);
-            const resets = aggData.map(d => d.Resets);
-            
-            const alternatingBgs = aggData.map(d => {
-                return d.seg_id % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)';
-            });
-            
-            const sessionBackgroundPlugin = {
-                id: 'sessionBackgrounds',
-                beforeDraw(chart) {
-                    const { ctx, chartArea } = chart;
-                    ctx.save();
-                    const meta = chart.getDatasetMeta(0);
-                    aggData.forEach((d, index) => {
-                        const model = meta.data[index];
-                        if (!model) return;
-                        
-                        const prevModel = meta.data[index - 1];
-                        const nextModel = meta.data[index + 1];
-                        
-                        const left = (index === 0 || !prevModel) ? chartArea.left : (prevModel.x + model.x) / 2;
-                        const right = (index === aggData.length - 1 || !nextModel) ? chartArea.right : (model.x + nextModel.x) / 2;
-                        
-                        ctx.fillStyle = alternatingBgs[index];
-                        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
-                    });
-                    ctx.restore();
-                }
-            };
-
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: useMinutes ? 'Duration (minutes)' : 'Duration (seconds)',
-                            data: durations,
-                            borderColor: '#2ecc71',
-                            backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Refused',
-                            data: rejects,
-                            borderColor: '#a0a0ff',
-                            backgroundColor: 'rgba(160, 160, 255, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Resets',
-                            data: resets,
-                            borderColor: '#f39c12',
-                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: 'Image Sequence',
-                                color: textMuted
-                            },
-                            ticks: { display: false }
-                        },
-                        y: {
-                            type: yScale,
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: 'Value',
-                                color: textMuted
-                            },
-                            ticks: {
-                                color: textMuted,
-                                callback: function(value, index) {
-                                    // Only show integer values
-                                    if (value % 1 !== 0) return;
-                                    // In log mode alternate visibility to avoid crowding
-                                    if (yScale === 'logarithmic') {
-                                        return index % 2 === 0 ? value : '';
-                                    }
-                                    return value;
-                                }
-                            },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            labels: { color: textMain, boxWidth: 15 }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                title: (tooltipItems) => {
-                                    const index = tooltipItems[0].dataIndex;
-                                    const record = aggData[index];
-                                    return `Image: ${record.Image || 'FAILED'}`;
-                                },
-                                label: (tooltipItem) => {
-                                    const index = tooltipItem.dataIndex;
-                                    const record = aggData[index];
-                                    const formatDur = (sec) => {
-                                        const h = Math.floor(sec / 3600);
-                                        const m = Math.floor((sec % 3600) / 60);
-                                        const s = Math.floor(sec % 60);
-                                        return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` :
-                                               m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
-                                    };
-                                    return [
-                                        `Account: ${record.account || 'N/A'}`,
-                                        `Time: ${record.time || 'N/A'}`,
-                                        `Duration: ${formatDur(record.Duration)}`,
-                                        `Refused Count: ${record.Rejects}`,
-                                        `Reset Count: ${record.Resets}`,
-                                        `Status: ${record.status || 'N/A'}`
-                                    ];
-                                }
-                            }
-                        }
-                    }
-                },
-                plugins: [sessionBackgroundPlugin]
-            });
-            setupChartInteraction(myChart, labels);
-        }
-
-        // Pan & zoom interaction for health charts (drag to pan, wheel to zoom, dblclick to reset)
-        function setupChartInteraction(chart, labels) {
-            const canvas = chart.canvas;
-
-            // Abort previous listeners on this canvas before attaching new ones
-            if (canvas._interactionAbort) canvas._interactionAbort.abort();
-            const controller = new AbortController();
-            canvas._interactionAbort = controller;
-            const sig = { signal: controller.signal };
-
-            let isDragging = false;
-            let dragStartX = 0;
-            let dragStartMin = 0;
-            let dragStartMax = 0;
-
-            chart._viewMin = 0;
-            chart._viewMax = labels.length - 1;
-
-            function applyView(min, max) {
-                if (!chart.ctx) return; // chart has been destroyed
-                let lo = Math.round(min);
-                let hi = Math.round(max);
-                const range = hi - lo;
-                if (range < 1) return;
-                // Clamp to boundary while preserving window size (avoids accidental zoom)
-                if (lo < 0) { lo = 0; hi = Math.min(range, labels.length - 1); }
-                if (hi > labels.length - 1) { hi = labels.length - 1; lo = Math.max(0, hi - range); }
-                chart._viewMin = lo;
-                chart._viewMax = hi;
-                chart.options.scales.x.min = labels[lo];
-                chart.options.scales.x.max = labels[hi];
-                chart.update('none');
-            }
-
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                const ca = chart.chartArea;
-                if (!ca) return;
-                const xPos = Math.max(0, Math.min(1, (e.clientX - rect.left - ca.left) / (ca.right - ca.left)));
-                const currentRange = chart._viewMax - chart._viewMin;
-                const zoomFactor = e.deltaY > 0 ? 1.25 : 0.8;
-                const newRange = currentRange * zoomFactor;
-                const centerIdx = chart._viewMin + xPos * currentRange;
-                applyView(centerIdx - xPos * newRange, centerIdx + (1 - xPos) * newRange);
-            }, { passive: false, ...sig });
-
-            canvas.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                dragStartX = e.clientX;
-                dragStartMin = chart._viewMin;
-                dragStartMax = chart._viewMax;
-                canvas.style.cursor = 'grabbing';
-            }, sig);
-
-            canvas.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                const ca = chart.chartArea;
-                if (!ca) return;
-                const chartWidth = ca.right - ca.left;
-                const currentRange = dragStartMax - dragStartMin;
-                const pixelPerUnit = chartWidth / Math.max(currentRange, 1);
-                const deltaIdx = (dragStartX - e.clientX) / pixelPerUnit;
-                applyView(dragStartMin + deltaIdx, dragStartMax + deltaIdx);
-            }, sig);
-
-            const stopDrag = () => { isDragging = false; canvas.style.cursor = 'grab'; };
-            canvas.addEventListener('mouseup', stopDrag, sig);
-            canvas.addEventListener('mouseleave', stopDrag, sig);
-
-            canvas.addEventListener('dblclick', () => {
-                if (!chart.ctx) return;
-                chart._viewMin = 0;
-                chart._viewMax = labels.length - 1;
-                delete chart.options.scales.x.min;
-                delete chart.options.scales.x.max;
-                chart.update('none');
-            }, sig);
-
-            canvas.style.cursor = 'grab';
-        }
-
-        // Render Table view
-        function renderTable(slicedData) {
-            const tbody = document.getElementById('healthTableBody');
-            tbody.innerHTML = '';
-            
-            if (!slicedData || slicedData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No records found.</td></tr>';
-                return;
-            }
-            
-            slicedData.forEach((row, i) => {
-                const tr = document.createElement('tr');
-                
-                const seq = row.Absolute_Event_Num || (slicedData.length - i);
-                const round = row.round || 'N/A';
-                const account = row.account || 'Unknown';
-                const time = row.time || 'N/A';
-                const health = row.health || '0s';
-                const filename = row.filename || '';
-                const status = row.status || 'N/A';
-                
-                let statusClass = 'status-badge';
-                if (status === 'Success') statusClass += ' status-success';
-                else if (status === 'Reject' || status === 'Refused') statusClass += ' status-refused';
-                else if (status === 'Reset') statusClass += ' status-reset';
-                else statusClass += ' status-fail';
-                
-                tr.innerHTML = `
-                    <td>${seq}</td>
-                    <td>${round}</td>
-                    <td style="font-weight: 500;">${account}</td>
-                    <td class="text-muted">${time}</td>
-                    <td>${health}</td>
-                    <td style="font-family: var(--font-mono); font-size: 11px; word-break: break-all;">${filename}</td>
-                    <td><span class="${statusClass}">${status === 'Reject' ? 'Refused' : status}</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Load account list status (active, quota switch details)
-        async function updateAccountStatusOverview() {
-            try {
-                const response = await api.getProfilesStatus();
-                const profiles = response.profiles;
-                const container = document.getElementById('accountStatusList');
-                container.innerHTML = '';
-                
-                if (!profiles || profiles.length === 0) {
-                    container.innerHTML = '<span class="text-muted text-small">No accounts recorded yet.</span>';
-                    return;
-                }
-                
-                profiles.forEach(prof => {
-                    const isQuotaFull = !!prof.quota_full;
-                    const isActive    = !!prof.active;
-                    const username    = prof.username;
-
-                    let nameColor   = 'var(--text-main)';
-                    let statusLabel = '';
-                    if (isQuotaFull) {
-                        nameColor   = 'var(--danger)';
-                        statusLabel = `<span class="job-status-badge conn-badge-disconnected" style="font-size: 9px !important; padding: 2px 6px; border-radius: 4px; height: 16px; font-weight: 700; line-height: 1; flex-shrink: 0; text-transform: uppercase;">QUOTA FULL</span>`;
-                    }
-                    if (isActive) {
-                        statusLabel = `<span class="job-status-badge conn-badge-connected" style="font-size: 9px !important; padding: 2px 6px; border-radius: 4px; height: 16px; font-weight: 700; line-height: 1; flex-shrink: 0; text-transform: uppercase; background-color: hsla(142, 70%, 50%, 0.25); border-color: hsla(142, 70%, 50%, 0.45); color: hsl(142, 75%, 40%) !important;">ACTIVE</span> ${statusLabel}`;
-                    }
-
-                    const row = document.createElement('div');
-                    if (isActive) {
-                        row.className = 'job-status-badge conn-badge-connected';
-                        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;width:100%;box-sizing:border-box;border-radius:6px;margin:2px 0;text-transform:none;letter-spacing:normal;font-weight:normal;line-height:normal;';
-                        row.innerHTML = `
-                            <span style="font-size:12px;font-weight:600;color:var(--success);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${username}</span>
-                            <span style="display:flex;align-items:center;gap:3px;flex-shrink:0;">${statusLabel}</span>
-                        `;
-                    } else {
-                        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;width:100%;box-sizing:border-box;';
-                        row.innerHTML = `
-                            <span style="font-size:12px;font-weight:600;color:${nameColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${username}</span>
-                            <span style="display:flex;align-items:center;gap:3px;flex-shrink:0;">${statusLabel}</span>
-                        `;
-                    }
-                    container.appendChild(row);
-                });
-
-
-            } catch (err) {
-                console.error("Failed to update account status list:", err);
-            }
-        }
-
-        // Top Status Header polling
-        async function updateStatusHeader() {
-            try {
-                // 1. Health (Engine status from Electron process)
-                let isServiceRunning = false;
-                let isBrowserRunning = false;
-                let isUpscalerRunning = false;
-                try {
-                    const svcStatus = await window.electronAPI.getEngineServiceStatus();
-                    isServiceRunning = svcStatus.running;
-                } catch (err) {
-                    console.error("Failed to get engine service status:", err);
-                }
-
-                if (isServiceRunning) {
-                    try {
-                        const bStatus = await api.getBrowserStatus();
-                        isBrowserRunning = !!(bStatus && bStatus.engine_running);
-                    } catch (err) {
-                        isServiceRunning = false;
-                    }
-
-                    try {
-                        const upscalerStatus = await api.getUpscalerStatus();
-                        isUpscalerRunning = !!(upscalerStatus && upscalerStatus.running);
-                    } catch (err) {
-                        console.error("Failed to get upscaler status:", err);
-                    }
-                }
-
-                const isBrowserOnline = isBrowserRunning || isUpscalerRunning;
-
-                const engineText = document.getElementById('engineStatusText');
-                const browserText = document.getElementById('browserStatusText');
-                const accountText = document.getElementById('browserAccountText');
-                
-                if (isServiceRunning) {
-                    engineText.textContent = 'ENGINE ON';
-                    engineText.className = 'job-status-badge conn-badge-connected';
-                } else {
-                    engineText.textContent = 'ENGINE OFF';
-                    engineText.className = 'job-status-badge conn-badge-disconnected';
-                }
-                
-                if (isBrowserOnline) {
-                    browserText.textContent = 'BROWSER ONLINE';
-                    browserText.className = 'job-status-badge conn-badge-connected';
-                } else {
-                    browserText.textContent = 'BROWSER OFFLINE';
-                    browserText.className = 'job-status-badge conn-badge-disconnected';
-                }
-                
-                // Get active account from config
-                try {
-                    const config = await api.getConfig();
-                    if (isUpscalerRunning) {
-                        accountText.textContent = config?.upscaler?.profile || 'Unknown';
-                    } else {
-                        accountText.textContent = config.active_user || 'Not Ready';
-                    }
-                } catch {
-                    accountText.textContent = 'Not Ready';
-                }
-                
-                // 2. Automation Stats
-                try {
-                    const stats = await api.getAutomationStats();
-                    const autoBadge = document.getElementById('autoStatusBadge');
-                    
-                    if (stats) {
-                        if (stats.is_running) {
-                            autoBadge.textContent = 'RUNNING';
-                            autoBadge.className = 'job-status-badge conn-badge-connected';
-                        } else if (stats.cycles > 0) {
-                            autoBadge.textContent = 'IDLE / FINISHED';
-                            autoBadge.className = 'job-status-badge conn-badge-disconnected';
-                        } else {
-                            autoBadge.textContent = 'STANDBY';
-                            autoBadge.className = 'job-status-badge conn-badge-disconnected';
-                        }
-                    } else {
-                        autoBadge.textContent = 'OFFLINE';
-                        autoBadge.className = 'job-status-badge conn-badge-disconnected';
-                    }
-                    
-                    const currentCycles = stats?.cycles || 0;
-                    const currentSuccesses = stats?.successes || 0;
-                    document.getElementById('statCycles').textContent = currentCycles;
-                    document.getElementById('statImages').textContent = currentSuccesses;
-                    document.getElementById('statRefused').textContent = stats?.refusals || 0;
-                    document.getElementById('statResets').textContent = stats?.resets || 0;
-
-                    // Update newly downloaded images badge
-                    if (baseSuccesses === null) {
-                        const clearedSuccessesStr = localStorage.getItem('setup_cleared_successes');
-                        if (clearedSuccessesStr === null) {
-                            baseSuccesses = currentSuccesses;
-                            localStorage.setItem('setup_cleared_successes', baseSuccesses);
-                        } else {
-                            baseSuccesses = parseInt(clearedSuccessesStr, 10) || 0;
-                        }
-                    }
-
-                    if (currentSuccesses < baseSuccesses) {
-                        baseSuccesses = currentSuccesses;
-                        localStorage.setItem('setup_cleared_successes', baseSuccesses);
-                    }
-
-                    const newImagesBadge = document.getElementById('newImagesBadge');
-                    if (newImagesBadge) {
-                        const delta = currentSuccesses - baseSuccesses;
-                        if (delta > 0) {
-                            newImagesBadge.textContent = `+${delta}`;
-                            newImagesBadge.style.display = 'inline-flex';
-                        } else {
-                            newImagesBadge.style.display = 'none';
-                        }
-                    }
-
-                    // Refresh chart when a new round completes
-                    if (lastKnownCycles >= 0 && currentCycles > lastKnownCycles) {
-                        await fetchHealthData();
-                    }
-                    lastKnownCycles = currentCycles;
-                } catch (statsErr) {
-                    console.error("Failed to load automation stats in account_health:", statsErr);
-                    const autoBadge = document.getElementById('autoStatusBadge');
-                    if (autoBadge) {
-                        autoBadge.textContent = 'OFFLINE';
-                        autoBadge.className = 'job-status-badge conn-badge-disconnected';
-                    }
-                }
-                
-                // Keep the sidebar account list active status fresh
-                await updateAccountStatusOverview();
-            } catch (err) {
-                console.error("Error updating status headers:", err);
-            }
-        }
-
-        // Sidebar download folder helper
+        // Electron open folders helper
         async function triggerOpenDownloadFolder(event) {
             if (event) event.preventDefault();
             try {
@@ -2049,1242 +241,260 @@
             }
         }
 
-        // ── Cycle Performance Insights JS Implementation ───────────────────────────
-        let tab3Cycles = [];
-        let tab3DetailedEvents = [];
-        let tab3Chart = null;
-        let isTab3Loading = false;
-
-        // Fetch Cycles and Detailed events for Tab 3
-        async function fetchTab3Data(forceRefresh = false) {
-            if (isTab3Loading) return;
-            isTab3Loading = true;
-
-            const cycleSelect = document.getElementById('tab3CycleSelect');
-            if (forceRefresh) {
-                cycleSelect.innerHTML = '<option>Loading...</option>';
-            }
-
-            try {
-                // Fetch cycles and detailed health logs in parallel
-                const [cyclesRes, healthRes] = await Promise.all([
-                    api.getAccountCycles(customLogPath),
-                    api.getAccountHealth('ALL_EVENTS', customLogPath)
-                ]);
-
-                tab3Cycles = cyclesRes.cycles || [];
-                tab3DetailedEvents = healthRes.detailed || [];
-
-                populateTab3Cycles(forceRefresh);
-            } catch (err) {
-                console.error("Failed to load Cycle Performance Insights data:", err);
-                cycleSelect.innerHTML = '<option>Error loading data</option>';
-            } finally {
-                isTab3Loading = false;
-            }
-        }
-
-        // Populate cycle options into select dropdown
-        function populateTab3Cycles(forceRefresh = false) {
-            const select = document.getElementById('tab3CycleSelect');
-            const previousValue = select.value;
-            select.innerHTML = '';
-
-            if (tab3Cycles.length === 0) {
-                select.innerHTML = '<option value="">No cycles recorded</option>';
-                const tbody = document.getElementById('insightsTableBody');
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No automation cycles recorded yet.</td></tr>';
-                if (tab3Chart) {
-                    tab3Chart.destroy();
-                    tab3Chart = null;
-                }
-                return;
-            }
-
-            // Generate option labels exactly matching Streamlit
-            const cycleOpts = tab3Cycles.map((c, i) => {
-                const startStr = c.full_start_time || c.start_time_str;
-                const stopStr = c.is_running ? 'Ongoing...' : c.stop_time_str;
-                return {
-                    value: `Cycle ${i + 1}`,
-                    text: `Cycle ${i + 1} (${startStr} - ${stopStr})`,
-                    id: i + 1
-                };
-            });
-
-            // Reverse-chronological order: latest cycle at the top
-            const reversedOpts = [...cycleOpts].reverse();
-
-            reversedOpts.forEach(opt => {
-                const el = document.createElement('option');
-                el.value = opt.value;
-                el.textContent = opt.text;
-                select.appendChild(el);
-            });
-
-            // Restore selection if valid, otherwise select latest (first reversed option)
-            if (!forceRefresh && previousValue && cycleOpts.some(o => o.value === previousValue)) {
-                select.value = previousValue;
-            } else if (reversedOpts.length > 0) {
-                select.value = reversedOpts[0].value;
-            }
-
-            renderTab3Insights();
-        }
-
-        // Triggered when cycle is changed
-        function onTab3CycleChange() {
-            renderTab3Insights(true); // reset slider to default max
-        }
-
-        // Triggered when Y-Axis selection is changed
-        function onTab3YAxisChange() {
-            renderTab3Insights(false); // keep slider value
-        }
-
-        // Group, slice and draw insights
-        function renderTab3Insights(resetSlider = false) {
-            const select = document.getElementById('tab3CycleSelect');
-            if (!select.value || select.value === "") return;
-
-            // Extract selected cycle ID (e.g. "Cycle 5" -> 5)
-            const cycleId = parseInt(select.value.split(' ')[1]);
-            const selectedCycle = tab3Cycles[cycleId - 1];
-
-            if (!selectedCycle) return;
-
-            // Filter detailed events inside this cycle index boundaries
-            const startIdx = selectedCycle.start_idx;
-            const endIdx = selectedCycle.end_idx !== null ? selectedCycle.end_idx : Infinity;
-
-            const cycleEvents = tab3DetailedEvents.filter(e => {
-                const lineIdx = e.log_line_idx !== undefined ? e.log_line_idx : -1;
-                return lineIdx >= startIdx && lineIdx <= endIdx;
-            });
-
-            // Group consecutive events by session index and account chronologically
-            const stats = [];
-            // raw events are reverse-chronological (newest first), reverse it to make it chronological
-            const chronologicalEvents = [...cycleEvents].reverse();
-
-            chronologicalEvents.forEach(e => {
-                const sId = e.session_index;
-                const acct = String(e.account || "Unknown").toLowerCase();
-
-                let healthStr = e.health_self || e.health || "0s";
-                let dur = parseFloat(healthStr.replace("s", "")) || 0;
-
-                const stVal = e.status || "";
-                const successVal = stVal === "Success" ? 1 : 0;
-                const rejectVal = (stVal === "Reject" || stVal === "Refused") ? 1 : 0;
-                const resetVal = stVal === "Reset" ? 1 : 0;
-
-                if (stats.length > 0 && stats[stats.length - 1].session_index === sId && stats[stats.length - 1].account.toLowerCase() === acct) {
-                    const last = stats[stats.length - 1];
-                    last.duration += dur;
-                    last.events += 1;
-                    last.images += successVal;
-                    last.refused += rejectVal;
-                    last.reset += resetVal;
-                } else {
-                    stats.push({
-                        session_index: sId,
-                        account: e.account || "Unknown",
-                        duration: dur,
-                        events: 1,
-                        images: successVal,
-                        refused: rejectVal,
-                        reset: resetVal,
-                        start_time: e.time || "Unknown"
-                    });
-                }
-            });
-
-            // Update Show Last N Accounts Slider
-            const maxAccounts = Math.max(1, stats.length);
-            const slider = document.getElementById('tab3NAccounts');
-            const sliderValLabel = document.getElementById('tab3NAccountsVal');
-
-            slider.max = Math.max(2, maxAccounts);
-            slider.disabled = (maxAccounts <= 1);
-
-            let currentSliderVal = maxAccounts;
-            if (!resetSlider) {
-                const savedVal = parseInt(slider.value);
-                if (savedVal && savedVal <= maxAccounts) {
-                    currentSliderVal = savedVal;
-                }
-            }
-
-            slider.value = currentSliderVal;
-            sliderValLabel.textContent = currentSliderVal;
-
-            // Slice view stats
-            const viewStats = currentSliderVal < stats.length ? stats.slice(stats.length - currentSliderVal) : stats;
-
-            // Generate Chart data
-            const colorsMap = {
-                "No Image (Base)": "#4f8bf9",
-                "No Image (Light)": "#a0c0ff",
-                "With Image (Base)": "#2ecc71",
-                "With Image (Light)": "#a0e6b5"
+        // Initialize dates
+        function initDateInputs() {
+            const today = new Date();
+            
+            // Format YYYY-MM-DD helper using local time
+            const formatLocalDate = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
             };
 
-            const chartData = viewStats.map((s, i) => {
-                const cType = i % 2 === 0 ? "Base" : "Light";
-                const colorVal = s.images > 0 ? `With Image (${cType})` : `No Image (${cType})`;
-                return {
-                    Seq: i + 1,
-                    Display: `#${i + 1} (${s.start_time})`,
-                    Account: s.account,
-                    DurationMinutes: s.duration / 60.0,
-                    DurationFormatted: formatDuration(s.duration),
-                    Events: s.events,
-                    Images: s.images,
-                    Refused: s.refused,
-                    Reset: s.reset,
-                    ColorHex: colorsMap[colorVal]
-                };
+            const dateToVal = formatLocalDate(today);
+            
+            const sixDaysAgo = new Date();
+            sixDaysAgo.setDate(today.getDate() - 6);
+            const dateFromVal = formatLocalDate(sixDaysAgo);
+
+            document.getElementById('dateTo').value = dateToVal;
+            document.getElementById('dateFrom').value = dateFromVal;
+            
+            // Clear date defaults to 30 days ago
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(today.getDate() - 30);
+            document.getElementById('clearDate').value = formatLocalDate(thirtyDaysAgo);
+        }
+
+        // Display status helper
+        function showStatus(msg, type = 'error') {
+            const banner = document.getElementById('statusBanner');
+            banner.textContent = msg;
+            banner.className = 'status-banner ' + type;
+        }
+
+        function clearStatus() {
+            const banner = document.getElementById('statusBanner');
+            banner.style.display = 'none';
+        }
+
+        // Populate account filter select list dynamically
+        function updateAccountFilter(summaryData) {
+            const select = document.getElementById('accountFilter');
+            const currentVal = select.value;
+            
+            // Re-build select
+            select.innerHTML = '<option value="">All accounts</option>';
+            
+            const accounts = new Set();
+            if (Array.isArray(summaryData)) {
+                summaryData.forEach(row => {
+                    if (row.grp) {
+                        accounts.add(row.grp);
+                    }
+                });
+            }
+            
+            Array.from(accounts).sort().forEach(acc => {
+                const opt = document.createElement('option');
+                opt.value = acc;
+                opt.textContent = acc;
+                if (acc === currentVal) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
             });
-
-            // Render Chart.js
-            drawInsightsChart(chartData, viewStats);
-
-            // Render Table underneath
-            drawInsightsTable(chartData);
         }
 
-        // Dynamic slider change
-        function updateTab3SliderVal(val) {
-            document.getElementById('tab3NAccountsVal').textContent = val;
+        // Main data loading function
+        async function loadAllData() {
+            clearStatus();
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const account = document.getElementById('accountFilter').value;
+
+            try {
+                // 1. Fetch Aggregates/Summary for Chart 1 and Account Filter
+                const summaryResp = await api.getHealthSummary({ date_from: dateFrom, date_to: dateTo, group_by: 'account' });
+                const summaryData = summaryResp.summary || [];
+                updateAccountFilter(summaryData);
+                renderBarChart(summaryData);
+
+                // 2. Fetch Events for Line Chart
+                const eventsParams = { date_from: dateFrom, date_to: dateTo, limit: 2000 };
+                if (account) {
+                    eventsParams.account = account;
+                }
+                const eventsResp = await api.getHealthEvents(eventsParams);
+                const eventsData = eventsResp.events || [];
+                renderLineChart(eventsData);
+
+                // 3. Fetch Runs Table
+                const runsResp = await api.getHealthRuns(50);
+                const runsData = runsResp.runs || [];
+                renderRunsTable(runsData);
+
+            } catch (err) {
+                showStatus("Failed to load health statistics: " + err.message, 'error');
+            }
         }
 
-        function onTab3SliderChange() {
-            renderTab3Insights(false);
-        }
-
-        // Render Bar Chart with Chart.js
-        function drawInsightsChart(chartData, viewStats) {
-            const ctx = document.getElementById('insightsChart').getContext('2d');
-            if (tab3Chart) {
-                tab3Chart.destroy();
+        // Render Grouped Bar Chart
+        function renderBarChart(data) {
+            if (barChartInstance) {
+                barChartInstance.destroy();
             }
 
-            if (chartData.length === 0) {
-                return;
-            }
+            const ctx = document.getElementById('barChart').getContext('2d');
+            
+            const labels = data.map(r => r.grp || 'Unknown');
+            const successes = data.map(r => r.successes || 0);
+            const refusals = data.map(r => r.refusals || 0);
+            const resets = data.map(r => r.resets || 0);
+            const quotaHits = data.map(r => r.quota_hits || 0);
 
-            const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8892b0';
-            const yAxisChoice = document.querySelector('input[name="tab3YAxis"]:checked').value;
-
-            const labels = chartData.map(d => d.Seq);
-            const yValues = chartData.map(d => yAxisChoice === 'Images Download' ? d.Images : d.DurationMinutes);
-            const bgColors = chartData.map(d => d.ColorHex);
-
-            tab3Chart = new Chart(ctx, {
+            barChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
+                    datasets: [
+                        { label: 'Successes', data: successes, backgroundColor: 'rgba(16, 185, 129, 0.75)', borderColor: 'rgb(16, 185, 129)', borderWidth: 1 },
+                        { label: 'Refusals', data: refusals, backgroundColor: 'rgba(245, 158, 11, 0.75)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 },
+                        { label: 'Resets', data: resets, backgroundColor: 'rgba(239, 68, 68, 0.75)', borderColor: 'rgb(239, 68, 68)', borderWidth: 1 },
+                        { label: 'Quota Hits', data: quotaHits, backgroundColor: 'rgba(139, 92, 246, 0.75)', borderColor: 'rgb(139, 92, 246)', borderWidth: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: 'hsl(210, 40%, 96%)', font: { family: 'Google Sans, sans-serif' } } }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' }, precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render Success Durations Line Chart
+        function renderLineChart(events) {
+            if (lineChartInstance) {
+                lineChartInstance.destroy();
+            }
+
+            const ctx = document.getElementById('lineChart').getContext('2d');
+
+            // Filter for event_type === 'success' and sort events oldest to newest (since query returns newest first)
+            const successEvents = events
+                .filter(e => e.event_type === 'success')
+                .reverse();
+
+            const labels = successEvents.map(e => {
+                const d = new Date(e.ts * 1000);
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ')';
+            });
+            const dataPoints = successEvents.map(e => e.duration_sec || 0);
+
+            lineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
                     datasets: [{
-                        data: yValues,
-                        backgroundColor: bgColors,
-                        borderWidth: 0,
-                        borderRadius: 4
+                        label: 'Duration (sec)',
+                        data: dataPoints,
+                        borderColor: 'rgb(99, 102, 241)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        fill: true,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: 'hsl(210, 40%, 96%)', font: { family: 'Google Sans, sans-serif' } } }
+                    },
                     scales: {
                         x: {
-                            grid: { display: false },
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: 'Seq',
-                                color: textMuted
-                            },
-                            ticks: {
-                                color: textMuted,
-                                font: { family: 'var(--font-sans)', size: 11 }
-                            }
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
                         },
                         y: {
-                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
-                            title: {
-                                display: true,
-                                text: yAxisChoice === 'Images Download' ? 'Images Downloaded' : 'Duration (minutes)',
-                                color: textMuted
-                            },
-                            ticks: {
-                                color: textMuted,
-                                font: { family: 'var(--font-sans)', size: 11 }
-                            },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                title: (tooltipItems) => {
-                                    const index = tooltipItems[0].dataIndex;
-                                    const s = viewStats[index];
-                                    return `#${index + 1} (${s.start_time})`;
-                                },
-                                label: (tooltipItem) => {
-                                    const index = tooltipItem.dataIndex;
-                                    const s = viewStats[index];
-                                    return [
-                                        `Account: ${s.account}`,
-                                        `Duration: ${formatDuration(s.duration)}`,
-                                        `Events: ${s.events}`,
-                                        `Images: ${s.images}`,
-                                        `Refused: ${s.refused}`,
-                                        `Reset: ${s.reset}`
-                                    ];
-                                }
-                            }
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
                         }
                     }
                 }
             });
         }
 
-        // Render Table data
-        function drawInsightsTable(chartData) {
-            const tbody = document.getElementById('insightsTableBody');
-            tbody.innerHTML = '';
-
-            if (chartData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No records found.</td></tr>';
+        // Render Runs Table
+        function renderRunsTable(runs) {
+            const tbody = document.getElementById('runsTableBody');
+            if (runs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td></tr>';
                 return;
             }
 
-            chartData.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.Seq}</td>
-                    <td style="font-weight: 600; color: var(--text-main);">${row.Account}</td>
-                    <td>${row.DurationFormatted}</td>
-                    <td>${row.Events}</td>
-                    <td style="color: #2ecc71; font-weight: 500;">${row.Images}</td>
-                    <td style="color: #a0a0ff;">${row.Refused}</td>
-                    <td style="color: #f39c12;">${row.Reset}</td>
+            tbody.innerHTML = runs.map(run => {
+                const startStr = run.start_ts ? new Date(run.start_ts * 1000).toLocaleString() : 'N/A';
+                const endStr = run.end_ts ? new Date(run.end_ts * 1000).toLocaleString() : 'N/A';
+                return `
+                    <tr>
+                        <td style="font-family: var(--font-mono); font-size: 12px; color: #a0a0ff;">${run.run_id}</td>
+                        <td>${startStr}</td>
+                        <td>${endStr}</td>
+                        <td>${run.accounts || 0}</td>
+                        <td style="color: var(--success); font-weight: 500;">${run.successes || 0}</td>
+                        <td style="color: var(--warning);">${run.refusals || 0}</td>
+                        <td style="color: var(--danger);">${run.resets || 0}</td>
+                        <td style="color: hsl(263, 80%, 65%);">${run.quota_hits || 0}</td>
+                    </tr>
                 `;
-                tbody.appendChild(tr);
-            });
+            }).join('');
         }
 
-        // Helper to format duration like Python's _fmt_dur
-        function formatDuration(x) {
-            const h = Math.floor(x / 3600);
-            const m = Math.floor((x % 3600) / 60);
-            const s = Math.floor(x % 60);
-            if (h > 0) {
-                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-            } else if (m > 0) {
-                return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-            } else {
-                return `${String(s).padStart(2, '0')}s`;
-            }
-        }
-
-        // ── Automation Cycle Management JS Implementation ──────────────────────────
-
-        // Fetch automation cycles data
-        async function fetchTab2Data(forceRefresh = false) {
-            if (isTab2Loading) {
-                console.log('[Tab2] fetchTab2Data: already loading, skipping.');
-                return;
-            }
-            isTab2Loading = true;
-            console.log('[Tab2] fetchTab2Data called. forceRefresh=', forceRefresh);
-
-            try {
-                const tbody = document.getElementById('managementTableBody');
-                if (!tbody) return;
-
-                if (forceRefresh) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">Loading cycles...</td></tr>';
-                }
-
-                const response = await api.getAccountCycles(customLogPath);
-                tab2Cycles = response.cycles || [];
-                console.log('[Tab2] Received', tab2Cycles.length, 'cycles from backend.');
-
-                // Calculate summary metrics
-                let totalCycles = tab2Cycles.length;
-                let totalImages = 0;
-                let totalRefusals = 0;
-                let totalResets = 0;
-
-                tab2Cycles.forEach(c => {
-                    totalImages += (c.success_count || 0);
-                    totalRefusals += (c.reject_count || 0);
-                    totalResets += (c.reset_count || 0);
-                });
-
-                document.getElementById('summaryTotalCycles').textContent = totalCycles;
-                document.getElementById('summaryTotalImages').textContent = totalImages;
-                document.getElementById('summaryTotalRefusals').textContent = totalRefusals;
-                document.getElementById('summaryTotalResets').textContent = totalResets;
-
-                renderTab2CyclesTable();
-
-                // If a cycle was selected, try to re-select it, or reset the detail panel
-                if (tab2SelectedCycleIdx >= 0 && tab2SelectedCycleIdx < tab2Cycles.length) {
-                    selectCycleDetail(tab2SelectedCycleIdx);
-                } else {
-                    resetTab2DetailPanel();
-                }
-
-            } catch (err) {
-                console.error('[Tab2] Failed to load Cycle Management data:', err);
-                const tbody = document.getElementById('managementTableBody');
-                if (tbody) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-danger">Error loading cycles: ' + err.message + '</td></tr>';
-                }
-            } finally {
-                isTab2Loading = false;
-            }
-        }
-
-        // Reset details view to placeholder state
-        function resetTab2DetailPanel() {
-            tab2SelectedCycleIdx = -1;
-            document.getElementById('timelinePlaceholder').classList.remove('hidden');
-            document.getElementById('timelineDetailContent').classList.add('hidden');
-            
-            // Hide the entire card container
-            const card = document.getElementById('cycleDetailCard');
-            if (card) card.classList.add('hidden');
-            
-            // Remove highlighted rows
-            const rows = document.querySelectorAll('#managementDataTable tbody tr');
-            rows.forEach(r => r.classList.remove('selected-row'));
-        }
-
-        // Render dynamic table rows for cycles
-        function renderTab2CyclesTable() {
-            const tbody = document.getElementById('managementTableBody');
-            tbody.innerHTML = '';
-
-            document.getElementById('tab2SelectAll').checked = false;
-            document.getElementById('tab2ActionsPanel').classList.add('hidden');
-
-            if (tab2Cycles.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No automation cycles recorded yet.</td></tr>';
+        // Clear health database entries helper
+        async function clearOldData() {
+            clearStatus();
+            const clearDate = document.getElementById('clearDate').value;
+            if (!clearDate) {
+                alert("Please select a valid date.");
                 return;
             }
 
-            tab2Cycles.forEach((c, idx) => {
-                const tr = document.createElement('tr');
-                tr.dataset.idx = idx;
-                
-                if (idx === tab2SelectedCycleIdx) {
-                    tr.classList.add('selected-row');
-                }
-
-                // Row click handler: select details
-                tr.onclick = (e) => {
-                    // Ignore clicks on checkbox td
-                    if (e.target.type === 'checkbox' || e.target.closest('td').firstElementChild?.type === 'checkbox') {
-                        return;
-                    }
-                    selectCycleDetail(idx);
-                };
-
-                const displayTime = c.full_start_time || c.start_time_str;
-                const stopStr = c.is_running ? 'Ongoing...' : c.stop_time_str;
-
-                // Duration Calculation
-                let dsec = 0;
-                let dsecValid = false;
-                try {
-                    const sDt = new Date(displayTime.replace(/-/g, '/'));
-                    const eDt = new Date(c.is_running ? new Date() : stopStr.replace(/-/g, '/'));
-                    if (!isNaN(sDt) && !isNaN(eDt)) {
-                        dsec = Math.floor((eDt - sDt) / 1000);
-                        if (dsec < 0) dsec += 86400;
-                        dsecValid = true;
-                    }
-                } catch (err) {}
-
-                let durationStr = "N/A";
-                if (dsecValid) {
-                    const dsecPos = Math.max(0, dsec);
-                    const hours = Math.floor(dsecPos / 3600);
-                    const minutes = Math.floor((dsecPos % 3600) / 60);
-                    durationStr = `${hours}:${String(minutes).padStart(2, '0')}`;
-                }
-
-                const successCount = c.success_count || 0;
-                const rejectCount = c.reject_count || 0;
-                const resetCount = c.reset_count || 0;
-
-                const checkboxHtml = c.is_running 
-                    ? `<input type="checkbox" disabled style="opacity: 0.3;" onclick="event.stopPropagation();">`
-                    : `<input type="checkbox" class="tab2-row-checkbox" data-idx="${idx}" onchange="onTab2RowCheckboxChange(); event.stopPropagation();">`;
-
-                const cycleIdHtml = c.is_running 
-                    ? '<span class="status-badge status-success" style="font-size: 9px; padding: 2px 6px;">Running</span>' 
-                    : `${idx + 1}`;
-
-                tr.innerHTML = `
-                    <td style="text-align: center;">${checkboxHtml}</td>
-                    <td style="font-weight: 600;">${cycleIdHtml}</td>
-                    <td class="text-muted" style="font-size: 11px;">${displayTime}</td>
-                    <td>${durationStr}</td>
-                    <td style="color: #2ecc71; font-weight: 500;">${successCount}</td>
-                    <td style="color: #a0a0ff;">${rejectCount}</td>
-                    <td style="color: #f39c12;">${resetCount}</td>
-                `;
-                
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Show detailed event timeline on the right pane
-        async function selectCycleDetail(idx) {
-            tab2SelectedCycleIdx = idx;
-            
-            // Highlight row
-            const rows = document.querySelectorAll('#managementDataTable tbody tr');
-            rows.forEach(r => {
-                if (parseInt(r.dataset.idx) === idx) {
-                    r.classList.add('selected-row');
-                } else {
-                    r.classList.remove('selected-row');
-                }
-            });
-
-            const cycle = tab2Cycles[idx];
-            if (!cycle) return;
-
-            // Toggle panels
-            document.getElementById('timelinePlaceholder').classList.add('hidden');
-            document.getElementById('timelineDetailContent').classList.remove('hidden');
-
-            // Show the entire card container
-            const card = document.getElementById('cycleDetailCard');
-            if (card) card.classList.remove('hidden');
-
-            document.getElementById('timelineTitle').textContent = `Cycle #${cycle.is_running ? 'Running' : idx + 1} Details`;
-            
-            const badge = document.getElementById('timelineStatusBadge');
-            if (cycle.is_running) {
-                badge.textContent = 'Ongoing';
-                badge.className = 'status-badge status-success';
-            } else {
-                badge.textContent = 'Completed';
-                badge.className = 'status-badge';
-                badge.style.background = 'rgba(255, 255, 255, 0.08)';
-                badge.style.color = 'var(--text-muted)';
-            }
-
-            const displayTime = cycle.full_start_time || cycle.start_time_str;
-            const stopStr = cycle.is_running ? 'Ongoing...' : cycle.stop_time_str;
-
-            // Duration
-            let dsec = 0;
-            let dsecValid = false;
-            try {
-                const sDt = new Date(displayTime.replace(/-/g, '/'));
-                const eDt = new Date(cycle.is_running ? new Date() : stopStr.replace(/-/g, '/'));
-                if (!isNaN(sDt) && !isNaN(eDt)) {
-                    dsec = Math.floor((eDt - sDt) / 1000);
-                    if (dsec < 0) dsec += 86400;
-                    dsecValid = true;
-                }
-            } catch (err) {}
-
-            let durationStr = "N/A";
-            if (dsecValid) {
-                const dsecPos = Math.max(0, dsec);
-                const h = Math.floor(dsecPos / 3600);
-                const m = Math.floor((dsecPos % 3600) / 60);
-                const s = Math.floor(dsecPos % 60);
-                durationStr = `${h}h ${m}m ${s}s`;
-            }
-
-            document.getElementById('timelineStartVal').textContent = displayTime;
-            document.getElementById('timelineStopVal').textContent = stopStr;
-            document.getElementById('timelineDurationVal').textContent = durationStr;
-            document.getElementById('timelineLinesVal').textContent = cycle.lines_count || 0;
-
-            const btnDelete = document.getElementById('btnDeleteCurrentCycle');
-            const btnExport = document.getElementById('btnExportCurrentCycle');
-
-            if (cycle.is_running) {
-                btnDelete.disabled = true;
-                btnDelete.style.opacity = 0.3;
-                btnDelete.style.cursor = 'not-allowed';
-            } else {
-                btnDelete.disabled = false;
-                btnDelete.style.opacity = 1;
-                btnDelete.style.cursor = 'pointer';
-                btnDelete.onclick = () => deleteSingleCycle(idx);
-            }
-
-            btnExport.onclick = () => exportSingleCycle(idx);
-
-            const container = document.getElementById('timelineNodesContainer');
-            container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px;">⏳ Loading event timeline...</div>';
-
-            try {
-                const healthRes = await api.getAccountHealth('ALL_EVENTS', customLogPath);
-                const detailedEvents = healthRes.detailed || [];
-
-                // Filter events that fall within this cycle's line indices
-                const cycleEvents = detailedEvents
-                    .filter(e => e.log_line_idx >= cycle.start_idx && e.log_line_idx <= cycle.end_idx)
-                    .reverse(); // events from API are newest first; we reverse to chronological order
-
-                container.innerHTML = '';
-
-                if (cycleEvents.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px;">No chronological events logged in this range.</div>';
-                    return;
-                }
-
-                // Initial Node
-                const startNode = document.createElement('div');
-                startNode.className = 'timeline-node node-start';
-                startNode.innerHTML = `
-                    <div class="node-time">${cycleEvents[0].time || ''}</div>
-                    <div class="node-header">Cycle Initialized</div>
-                    <div class="node-body">Log scanning started at index ${cycle.start_idx}.</div>
-                `;
-                container.appendChild(startNode);
-
-                let currentAcct = null;
-
-                cycleEvents.forEach(e => {
-                    // Account Switched detection
-                    if (e.account && e.account !== currentAcct) {
-                        currentAcct = e.account;
-                        const switchNode = document.createElement('div');
-                        switchNode.className = 'timeline-node node-switch';
-                        switchNode.innerHTML = `
-                            <div class="node-time">${e.time || ''}</div>
-                            <div class="node-header" style="color: var(--accent);">👥 Active Account Switched</div>
-                            <div class="node-body">Switched execution context to: <strong>${currentAcct}</strong></div>
-                        `;
-                        container.appendChild(switchNode);
-                    }
-
-                    const node = document.createElement('div');
-                    node.className = 'timeline-node';
-
-                    if (e.status === 'Success') {
-                        node.className += ' node-success';
-                        node.innerHTML = `
-                            <div class="node-time">${e.time || ''}</div>
-                            <div class="node-header" style="color: #2ecc71;">✅ Image Saved (Round ${e.round})</div>
-                            <div class="node-body">File: <code>${e.filename}</code> (Duration: ${e.health})</div>
-                        `;
-                    } else if (e.status === 'Reject') {
-                        node.className += ' node-refused';
-                        node.innerHTML = `
-                            <div class="node-time">${e.time || ''}</div>
-                            <div class="node-header" style="color: var(--warning);">⚠️ AI Request Refused (Round ${e.round})</div>
-                            <div class="node-body">FastAPI session rejected (Duration: ${e.health})</div>
-                        `;
-                    } else if (e.status === 'Reset') {
-                        node.className += ' node-reset';
-                        node.innerHTML = `
-                            <div class="node-time">${e.time || ''}</div>
-                            <div class="node-header" style="color: var(--danger);">🔌 Session Reset (Round ${e.round})</div>
-                            <div class="node-body">Automation engine triggered safety reset (Duration: ${e.health})</div>
-                        `;
-                    } else { // Fail or generic failures
-                        node.className += ' node-reset';
-                        node.innerHTML = `
-                            <div class="node-time">${e.time || ''}</div>
-                            <div class="node-header" style="color: var(--danger);">❌ Step Failed (Round ${e.round})</div>
-                            <div class="node-body">Execution failure encountered (Duration: ${e.health})</div>
-                        `;
-                    }
-                    container.appendChild(node);
-                });
-
-                // Conclude Node
-                if (!cycle.is_running) {
-                    const stopNode = document.createElement('div');
-                    stopNode.className = 'timeline-node node-stop';
-                    stopNode.innerHTML = `
-                        <div class="node-time">${cycleEvents[cycleEvents.length - 1].time || ''}</div>
-                        <div class="node-header">Cycle Concluded</div>
-                        <div class="node-body">Session terminated at log index ${cycle.end_idx}.</div>
-                    `;
-                    container.appendChild(stopNode);
-                }
-
-            } catch (err) {
-                console.error('[Tab2] Timeline loading error:', err);
-                container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 11px;">⚠️ Failed to load timeline detail: ${err.message}</div>`;
-            }
-        }
-
-        // Action: Delete Single Cycle
-        async function deleteSingleCycle(idx) {
-            const cycle = tab2Cycles[idx];
-            if (!cycle) return;
-
-            if (!confirm(`Are you sure you want to delete Cycle #${idx + 1}? This will permanently modify engine.log.`)) {
+            if (!confirm(`Are you sure you want to permanently delete all health events recorded prior to ${clearDate}?`)) {
                 return;
             }
 
             try {
-                const cyclesToDelete = [{
-                    start_idx: cycle.start_idx,
-                    end_idx: cycle.end_idx
-                }];
-                await api.deleteCycles(cyclesToDelete, customLogPath);
-                alert("Successfully deleted cycle.");
-                resetTab2DetailPanel();
-                await fetchTab2Data(true);
+                const res = await api.clearHealthBefore(clearDate);
+                const count = res.deleted || 0;
+                showStatus(`Successfully cleared ${count} old events.`, 'success');
+                loadAllData();
             } catch (err) {
-                alert("Failed to delete cycle: " + err.message);
+                showStatus("Failed to clear old data: " + err.message, 'error');
             }
         }
 
-        // Action: Export Single Cycle
-        async function exportSingleCycle(idx) {
-            const cycle = tab2Cycles[idx];
-            if (!cycle) return;
-
-            const firstStart = cycle.full_start_time || cycle.start_time_str;
-            const safeTimeStr = firstStart.replace(/[:-\s]/g, '_');
-            const defaultFilename = `cycle_${idx + 1}_${safeTimeStr}.log`;
-
-            try {
-                const savePath = await window.electronAPI.saveFile({
-                    title: 'Save Cycle Log',
-                    defaultPath: defaultFilename,
-                    filters: [
-                        { name: 'Log Files', extensions: ['log'] },
-                        { name: 'All Files', extensions: ['*'] }
-                    ]
-                });
-
-                if (!savePath) return; // User cancelled
-
-                const cyclesToSave = [{
-                    start_idx: cycle.start_idx,
-                    end_idx: cycle.end_idx
-                }];
-
-                await api.saveCycles(cyclesToSave, savePath, customLogPath);
-                alert(`Successfully saved cycle logs to: ${savePath}`);
-            } catch (err) {
-                alert("Failed to save cycle logs: " + err.message);
-            }
-        }
-
-        // Toggle Select All
-        function toggleTab2SelectAll(master) {
-            const checkboxes = document.querySelectorAll('.tab2-row-checkbox');
-            checkboxes.forEach(cb => {
-                if (!cb.disabled) {
-                    cb.checked = master.checked;
-                }
-            });
-            onTab2RowCheckboxChange();
-        }
-
-        // Update actions panel on checkbox status change
-        function onTab2RowCheckboxChange() {
-            const selected = document.querySelectorAll('.tab2-row-checkbox:checked');
-            const panel = document.getElementById('tab2ActionsPanel');
-            const label = document.getElementById('tab2SelectedWarningLabel');
-
-            if (selected.length > 0) {
-                panel.classList.remove('hidden');
-                label.textContent = `Selected ${selected.length} cycle${selected.length !== 1 ? 's' : ''}.`;
-            } else {
-                panel.classList.add('hidden');
-            }
-        }
-
-        // Action: Delete Selected Cycles
-        async function deleteSelectedCycles(event) {
-            if (event) event.stopPropagation();
-            const selected = Array.from(document.querySelectorAll('.tab2-row-checkbox:checked'));
-            if (selected.length === 0) return;
-
-            if (!confirm(`Are you sure you want to delete the ${selected.length} selected cycle(s)? This will modify engine.log permanently.`)) {
-                return;
-            }
-
-            const cyclesToDelete = selected.map(cb => {
-                const idx = parseInt(cb.dataset.idx);
-                return {
-                    start_idx: tab2Cycles[idx].start_idx,
-                    end_idx: tab2Cycles[idx].end_idx
-                };
-            });
-
-            try {
-                await api.deleteCycles(cyclesToDelete, customLogPath);
-                alert("Successfully deleted selected cycles.");
-                resetTab2DetailPanel();
-                await fetchTab2Data(true);
-            } catch (err) {
-                alert("Failed to delete cycles: " + err.message);
-            }
-        }
-
-        // Action: Save Selected Cycles
-        async function saveSelectedCycles(event) {
-            if (event) event.stopPropagation();
-            const selected = Array.from(document.querySelectorAll('.tab2-row-checkbox:checked'));
-            if (selected.length === 0) return;
-
-            const firstIdx = parseInt(selected[0].dataset.idx);
-            const firstStart = tab2Cycles[firstIdx].full_start_time || tab2Cycles[firstIdx].start_time_str;
-            const safeTimeStr = firstStart.replace(/[:-\s]/g, '_');
-            const defaultFilename = `selected_cycles_${safeTimeStr}.log`;
-
-            try {
-                const savePath = await window.electronAPI.saveFile({
-                    title: 'Save Selected Cycles Logs',
-                    defaultPath: defaultFilename,
-                    filters: [
-                        { name: 'Log Files', extensions: ['log'] },
-                        { name: 'All Files', extensions: ['*'] }
-                    ]
-                });
-
-                if (!savePath) return; // User cancelled
-
-                const cyclesToSave = selected.map(cb => {
-                    const idx = parseInt(cb.dataset.idx);
-                    return {
-                        start_idx: tab2Cycles[idx].start_idx,
-                        end_idx: tab2Cycles[idx].end_idx
-                    };
-                });
-
-                await api.saveCycles(cyclesToSave, savePath, customLogPath);
-                alert(`Successfully saved cycles logs to: ${savePath}`);
-                
-                // Clear selection
-                selected.forEach(cb => cb.checked = false);
-                document.getElementById('tab2SelectAll').checked = false;
-                onTab2RowCheckboxChange();
-            } catch (err) {
-                alert("Failed to save cycles logs: " + err.message);
-            }
-        }
-
-        // ── Account Credentials Tab JS ─────────────────────────────────────────────
-
-        // In-memory working copy of the credentials list
-        let _credRows = [];
-
-        // Called when the tab is activated
-        async function fetchCredentialsTab() {
-            await _loadCredentials();
-        }
-
-        // Load profiles from backend and populate UI
-        async function _loadCredentials() {
-            try {
-                const [profilesRes, config] = await Promise.all([
-                    api.getProfilesStatus(),
-                    api.getConfig()
-                ]);
-
-                _credRows = profilesRes.profiles || [];
-
-                _renderActiveAccountSelect();
-                _renderCredentialsTable();
-
-                // Bypass Quota Full toggle
-                const bypassToggle = document.getElementById('bypassQuotaFullToggle');
-                if (bypassToggle) {
-                    bypassToggle.checked = !!config.bypass_quota_full;
-                }
-
-                _setCredentialsStatus('');
-            } catch (err) {
-                console.error('[Credentials] Load error:', err);
-                _setCredentialsStatus('⚠️ Failed to load profiles.');
-            }
-        }
-
-        // Populate the Active Account dropdown
-        function _renderActiveAccountSelect() {
-            const sel = document.getElementById('activeAccountSelect');
-            if (!sel) return;
-            const prev = sel.value;
-            sel.innerHTML = '';
-
-            if (!_credRows || _credRows.length === 0) {
-                sel.innerHTML = '<option value="">No accounts</option>';
-                return;
-            }
-
-            _credRows.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.username || '';
-                opt.textContent = r.username || '(empty)';
-                if (r.active) opt.selected = true;
-                sel.appendChild(opt);
-            });
-
-            // Re-select previously selected if not empty
-            if (prev && sel.querySelector(`option[value="${prev}"]`)) {
-                sel.value = prev;
-            }
-        }
-
-        // Render the credentials table rows
-        function _renderCredentialsTable() {
-            const tbody = document.getElementById('credentialsTableBody');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            if (!_credRows || _credRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;" class="text-muted">No credentials found. Add an account below.</td></tr>';
-                return;
-            }
-
-            _credRows.forEach((row, idx) => {
-                const tr = document.createElement('tr');
-                tr.dataset.idx = idx;
-
-                const isActive = !!row.active;
-                const bypassChecked = row.bypass ? 'checked' : '';
-                const autoDeleteChecked = row.auto_delete ? 'checked' : '';
-                const username = row.username || '';
-                const quotaFull = row.quota_full || '';
-                const switchedAt = row.last_switched_at || '';
-                const sessionImages = row.session_images || '';
-                const sessionRefused = row.session_refused || '';
-                const sessionResets = row.session_resets || '';
-
-                const rangeOptions = ['Last hour', 'Last day', 'All time']
-                    .map(v => `<option value="${v}" ${row.delete_range === v ? 'selected' : ''}>${v}</option>`)
-                    .join('');
-
-                tr.innerHTML = `
-                    <td style="text-align:center;">
-                        <span class="status-badge ${isActive ? 'status-success' : ''}" style="${isActive ? 'background:rgba(46,204,113,0.18);color:#2ecc71;' : 'background:rgba(255,255,255,0.05);color:var(--text-muted);'} font-size:9px; padding:2px 6px;">
-                            ${isActive ? 'ACTIVE' : '—'}
-                        </span>
-                    </td>
-                    <td style="text-align:center;">
-                        <input type="checkbox" class="cred-bypass" data-idx="${idx}" ${bypassChecked}
-                               style="accent-color:var(--accent); cursor:pointer; width:16px; height:16px;">
-                    </td>
-                    <td style="font-size:12px; font-weight:500; vertical-align:middle;">
-                        ${username}
-                    </td>
-                    <td style="text-align:center;">
-                        <input type="checkbox" class="cred-auto-delete" data-idx="${idx}" ${autoDeleteChecked}
-                               style="accent-color:var(--accent); cursor:pointer; width:16px; height:16px;">
-                    </td>
-                    <td>
-                        <select class="form-control cred-delete-range" data-idx="${idx}"
-                                style="padding:4px 8px; font-size:12px;">
-                            ${rangeOptions}
-                        </select>
-                    </td>
-                    <td class="text-muted" style="font-size:11px; font-family:var(--font-mono);">${quotaFull}</td>
-                    <td class="text-muted" style="font-size:11px; font-family:var(--font-mono);">${switchedAt}</td>
-                    <td style="text-align:center; color:#2ecc71; font-weight:500;">${sessionImages}</td>
-                    <td style="text-align:center; color:#a0a0ff;">${sessionRefused}</td>
-                    <td style="text-align:center; color:#f39c12;">${sessionResets}</td>
-                    <td style="text-align:center;">
-                        <button class="btn btn-danger" onclick="deleteCredentialsRow(${idx})"
-                                style="padding:3px 8px; font-size:11px; min-width:unset;">🗑️</button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // Status message helper
-        function _setCredentialsStatus(msg, isError = false) {
-            const el = document.getElementById('credentialsTableStatus');
-            if (!el) return;
-            el.textContent = msg;
-            el.className = 'text-small font-weight-600 ' + (isError ? 'text-danger' : 'text-success');
-        }
-
-        // Collect current edits from the DOM into _credRows
-        function _collectTableEdits() {
-            document.querySelectorAll('#credentialsTableBody tr[data-idx]').forEach(tr => {
-                const idx = parseInt(tr.dataset.idx);
-                if (isNaN(idx) || idx < 0 || idx >= _credRows.length) return;
-                const row = _credRows[idx];
-
-                const bypassInput = tr.querySelector('.cred-bypass');
-                const autoDeleteInput = tr.querySelector('.cred-auto-delete');
-                const rangeInput = tr.querySelector('.cred-delete-range');
-
-                if (bypassInput)   row.bypass     = bypassInput.checked;
-                if (autoDeleteInput) row.auto_delete = autoDeleteInput.checked;
-                if (rangeInput)    row.delete_range = rangeInput.value;
-            });
-        }
-
-        // ── Public actions ──────────────────────────────────────────────────────────
-
-        // Set Active Account
-        async function onSetActiveAccount() {
-            const sel = document.getElementById('activeAccountSelect');
-            if (!sel) return;
-            const target = sel.value;
-            if (!target) { alert('No account selected.'); return; }
-
-            try {
-                _collectTableEdits();
-                const updated = _credRows.map(r => ({ ...r, active: r.username === target }));
-                await api.saveProfiles(updated);
-                // Persist active_user in config as well
-                await api.saveConfig({ active_user: target });
-                _credRows = updated;
-                _renderActiveAccountSelect();
-                _renderCredentialsTable();
-                _setCredentialsStatus(`✅ Active account set to: ${target}`);
-            } catch (err) {
-                console.error('[Credentials] Set active error:', err);
-                _setCredentialsStatus('⚠️ Failed to set active account.', true);
-            }
-        }
-
-        // Bypass Quota Full toggle
-        async function onToggleBypassQuotaFull() {
-            const toggle = document.getElementById('bypassQuotaFullToggle');
-            if (!toggle) return;
-            try {
-                await api.saveConfig({ bypass_quota_full: toggle.checked });
-                _setCredentialsStatus(toggle.checked ? '✅ Bypass Quota Full: ON' : '✅ Bypass Quota Full: OFF');
-            } catch (err) {
-                console.error('[Credentials] Bypass toggle error:', err);
-                _setCredentialsStatus('⚠️ Failed to save bypass setting.', true);
-            }
-        }
-
-        // Reload table from disk
-        async function reloadCredentialsTable() {
-            _setCredentialsStatus('Reloading...');
-            await _loadCredentials();
-            _setCredentialsStatus('✅ Table reloaded.');
-        }
-
-        // Clear Quota Full column
-        async function clearQuotaColumn() {
-            if (!confirm('Clear all Quota Full timestamps? Session stats will also be reset for affected rows.')) return;
-            try {
-                _collectTableEdits();
-                const updated = _credRows.map(r => ({
-                    ...r,
-                    quota_full: '',
-                    session_images: r.quota_full ? '0' : r.session_images,
-                    session_refused: r.quota_full ? '0' : r.session_refused,
-                    session_resets: r.quota_full ? '0' : r.session_resets
-                }));
-                await api.saveProfiles(updated);
-                _credRows = updated;
-                _renderCredentialsTable();
-                _setCredentialsStatus('✅ Quota Full column cleared.');
-            } catch (err) {
-                _setCredentialsStatus('⚠️ Failed to clear quota column.', true);
-            }
-        }
-
-        // Clear Switched At column
-        async function clearSwitchedColumn() {
-            if (!confirm('Clear all "Switched At" timestamps?')) return;
-            try {
-                _collectTableEdits();
-                const updated = _credRows.map(r => ({ ...r, last_switched_at: '' }));
-                await api.saveProfiles(updated);
-                _credRows = updated;
-                _renderCredentialsTable();
-                _setCredentialsStatus('✅ Switched At column cleared.');
-            } catch (err) {
-                _setCredentialsStatus('⚠️ Failed to clear Switched At column.', true);
-            }
-        }
-
-        // Reset session stats columns
-        async function resetStatsColumn() {
-            if (!confirm('Reset all session stats (Images, Refused, Resets) to empty?')) return;
-            try {
-                _collectTableEdits();
-                const updated = _credRows.map(r => ({
-                    ...r,
-                    session_images: '',
-                    session_refused: '',
-                    session_resets: ''
-                }));
-                await api.saveProfiles(updated);
-                _credRows = updated;
-                _renderCredentialsTable();
-                _setCredentialsStatus('✅ Session stats reset.');
-            } catch (err) {
-                _setCredentialsStatus('⚠️ Failed to reset stats.', true);
-            }
-        }
-
-        // Add a blank row to the table
-        function addCredentialsRow() {
-            // Create a dialog element
-            const dialog = document.createElement('dialog');
-            dialog.style.padding = '24px';
-            dialog.style.borderRadius = 'var(--radius-sm, 6px)';
-            dialog.style.border = '1px solid var(--border, #3f4e6b)';
-            dialog.style.background = 'var(--bg-secondary, #1e2535)';
-            dialog.style.color = 'var(--text-main, #ffffff)';
-            dialog.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.5)';
-            dialog.style.minWidth = '320px';
-            dialog.style.fontFamily = 'var(--font-sans, "Microsoft YaHei UI", sans-serif)';
-            dialog.style.outline = 'none';
-
-            const title = document.createElement('h3');
-            title.textContent = '➕ Add Account';
-            title.style.marginTop = '0';
-            title.style.marginBottom = '16px';
-            title.style.fontSize = '16px';
-            title.style.fontWeight = '600';
-            dialog.appendChild(title);
-
-            const label = document.createElement('div');
-            label.textContent = 'Enter new account username (email or name):';
-            label.style.fontSize = '13px';
-            label.style.marginBottom = '10px';
-            label.style.color = 'var(--text-muted, #94a3b8)';
-            dialog.appendChild(label);
-
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.placeholder = 'e.g. dapmuar';
-            input.style.width = '100%';
-            input.style.padding = '8px 12px';
-            input.style.marginBottom = '18px';
-            input.style.border = '1px solid var(--border, #3f4e6b)';
-            input.style.borderRadius = 'var(--radius-sm, 4px)';
-            input.style.background = 'rgba(0, 0, 0, 0.2)';
-            input.style.color = 'var(--text-main, #ffffff)';
-            input.style.outline = 'none';
-            input.style.boxSizing = 'border-box';
-            dialog.appendChild(input);
-
-            const btnContainer = document.createElement('div');
-            btnContainer.style.display = 'flex';
-            btnContainer.style.justifyContent = 'flex-end';
-            btnContainer.style.gap = '10px';
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.className = 'btn';
-            cancelBtn.style.background = 'rgba(255, 255, 255, 0.05)';
-            cancelBtn.style.color = 'var(--text-main)';
-            cancelBtn.onclick = () => {
-                dialog.close();
-                dialog.remove();
-            };
-            btnContainer.appendChild(cancelBtn);
-
-            const addBtn = document.createElement('button');
-            addBtn.textContent = 'Add';
-            addBtn.className = 'btn';
-            addBtn.style.background = 'var(--accent, #6366f1)';
-            addBtn.style.color = '#fff';
-            
-            const submit = () => {
-                const username = input.value;
-                if (!username) {
-                    dialog.close();
-                    dialog.remove();
-                    return;
-                }
-                const trimmed = username.trim();
-                if (!trimmed) {
-                    dialog.close();
-                    dialog.remove();
-                    return;
-                }
-
-                // Check duplicate
-                if (_credRows.some(r => r.username.toLowerCase() === trimmed.toLowerCase())) {
-                    alert("Account username already exists!");
-                    return;
-                }
-
-                _collectTableEdits();
-                _credRows.push({
-                    active: false,
-                    bypass: false,
-                    username: trimmed,
-                    auto_delete: false,
-                    delete_range: 'Last hour',
-                    quota_full: '',
-                    last_switched_at: '',
-                    session_images: '',
-                    session_refused: '',
-                    session_resets: ''
-                });
-                _renderActiveAccountSelect();
-                _renderCredentialsTable();
-                _setCredentialsStatus(`✅ Added account: ${trimmed}`);
-                
-                dialog.close();
-                dialog.remove();
-            };
-
-            addBtn.onclick = submit;
-            input.onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    submit();
-                } else if (e.key === 'Escape') {
-                    dialog.close();
-                    dialog.remove();
-                }
-            };
-            btnContainer.appendChild(addBtn);
-
-            dialog.appendChild(btnContainer);
-            document.body.appendChild(dialog);
-            
-            dialog.showModal();
-            input.focus();
-        }
-
-        // Delete a row by index
-        function deleteCredentialsRow(idx) {
-            _collectTableEdits();
-            if (idx < 0 || idx >= _credRows.length) return;
-            const name = _credRows[idx].username || '(empty)';
-            if (!confirm(`Delete account "${name}" from the list? This does not remove the browser profile.`)) return;
-            _credRows.splice(idx, 1);
-            _renderActiveAccountSelect();
-            _renderCredentialsTable();
-            _setCredentialsStatus(`Deleted row: ${name}`);
-        }
-
-        // Save all table changes to disk
-        async function saveCredentialsChanges() {
-            try {
-                _collectTableEdits();
-                // Filter empty usernames
-                const toSave = _credRows.filter(r => String(r.username || '').trim() !== '');
-                await api.saveProfiles(toSave);
-                _credRows = toSave;
-                _renderActiveAccountSelect();
-                _renderCredentialsTable();
-                _setCredentialsStatus('✅ Credentials saved.');
-            } catch (err) {
-                console.error('[Credentials] Save error:', err);
-                _setCredentialsStatus('⚠️ Failed to save credentials.', true);
-            }
-        }
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initDateInputs();
+            loadAllData();
+        });
     </script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import json
 import logging
 import subprocess
 import traceback
+import health_db
 
 logger = logging.getLogger('conductor')
 
@@ -201,6 +202,8 @@ class AutomationManager:
         self._lc_time_threshold_start_time = None
         self._needs_new_chat = True
         self._session_lost = False
+        self._run_id = None
+        health_db.init_db()
         
     async def _post(self, path, json_data=None):
         url = self.get_engine_url() + path
@@ -247,6 +250,10 @@ class AutomationManager:
 
         self.automation_status["initial_user"] = config.get("active_user")
         self.automation_status["current_account_id"] = config.get("active_user")
+        self._run_id = time.strftime("%Y%m%d-%H%M%S")
+        health_db.record_event(self._run_id, "run_start",
+                               account=config.get("active_user"),
+                               extra={"mode": mode, "goal": goal})
             
         self._task = asyncio.create_task(self._run_loop())
 
@@ -418,6 +425,12 @@ class AutomationManager:
 
                                     cycle_dur = time.time() - self._cycle_start_time
                                     lc_dur = time.time() - self._lc_cycle_start_time
+                                    health_db.record_event(
+                                        self._run_id, "success",
+                                        account=self.automation_status["current_account_id"],
+                                        cycle_index=self.automation_status["cycles"],
+                                        duration_sec=cycle_dur,
+                                        filename=os.path.basename(saved_paths[0]) if saved_paths else None)
                                     
                                     cycle_refused_snap = self._pending_refused
                                     cycle_resets_snap = self._pending_resets
@@ -459,6 +472,11 @@ class AutomationManager:
                             if cls_status == "refused":
                                 self.automation_status["cycles"] += 1
                                 self.automation_status["refusals"] += 1
+                                health_db.record_event(
+                                    self._run_id, "refused",
+                                    account=self.automation_status["current_account_id"],
+                                    cycle_index=self.automation_status["cycles"],
+                                    extra={"text": (text or "")[:200]})
                                 self._pending_refused += 1
                                 self.automation_status["pending_refused"] = self._pending_refused
                                 self._lc_pending_refused += 1
@@ -488,6 +506,11 @@ class AutomationManager:
             logger.error(f"Automation loop error: {traceback.format_exc()}")
         finally:
             self.automation_status["is_running"] = False
+            s = self.automation_status
+            health_db.record_event(
+                self._run_id, "run_end", account=s.get("current_account_id"),
+                extra={"cycles": s.get("cycles"), "successes": s.get("successes"),
+                       "refusals": s.get("refusals"), "resets": s.get("resets")})
 
     def _record_reset(self):
         self.automation_status["resets"] += 1
@@ -496,6 +519,10 @@ class AutomationManager:
         self.automation_status["pending_resets"] = self._pending_resets
         self._lc_pending_resets += 1
         self._needs_new_chat = True
+        health_db.record_event(
+            self._run_id, "reset",
+            account=self.automation_status["current_account_id"],
+            cycle_index=self.automation_status["cycles"])
         
     def _check_loop_control_thresholds(self, loop_ctrl: dict, result: dict):
         if not loop_ctrl:
@@ -536,6 +563,9 @@ class AutomationManager:
         elif action == "re_login":
             await self._post("/engine/re_login", {})
             self._needs_new_chat = True
+            health_db.record_event(
+                self._run_id, "re_login",
+                account=self.automation_status["current_account_id"])
 
     async def _switch_to_next_profile(self):
         resp = await self._get("/engine/profiles")
@@ -555,10 +585,16 @@ class AutomationManager:
         next_user = next_profile.get("email") or next_profile.get("name")
         
         await do_account_switch(self.get_engine_url, self.ensure_service, next_user, next_profile.get("dir"))
+        health_db.record_event(
+            self._run_id, "switch", account=next_user,
+            extra={"from": cur, "reason": "loop_control"})
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
 
     async def _handle_quota(self):
+        health_db.record_event(
+            self._run_id, "quota",
+            account=self.automation_status["current_account_id"])
         await self._post("/engine/stop", {})
         
         resp = await self._get("/engine/profiles")
@@ -597,5 +633,8 @@ class AutomationManager:
                     return
         
         await do_account_switch(self.get_engine_url, self.ensure_service, next_user, next_profile.get("dir"))
+        health_db.record_event(
+            self._run_id, "switch", account=next_user,
+            extra={"from": cur, "reason": "quota"})
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
