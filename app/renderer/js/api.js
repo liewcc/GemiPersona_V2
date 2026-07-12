@@ -80,10 +80,6 @@ const api = {
         return this.request('/browser/automation/start', 'POST', { mode, goal, config });
     },
 
-    continueAutomation() {
-        return this.request('/browser/automation/continue', 'POST');
-    },
-
     stopAutomation() {
         return this.request('/browser/automation/stop', 'POST');
     },

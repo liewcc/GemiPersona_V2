@@ -451,10 +451,7 @@
                         <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">AUTOMATION CONTROL</div>
                         
                         <div class="d-flex align-center justify-between mb-20" style="background: rgba(0,0,0,0.15); padding: 10px 15px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                            <div class="d-flex align-center gap-10">
-                                <label class="text-small mb-0 text-accent font-weight-600">Auto Looping</label>
-                                <label class="switch"><input type="checkbox" id="autoLoopingToggle" checked onchange="saveAutomationSettings()"><span class="slider"></span></label>
-                            </div>
+
                             <div class="d-flex align-center gap-10">
                                 <label class="text-small mb-0 text-accent font-weight-600">Goal</label>
                                 <input type="number" id="autoGoalInput" class="form-control" value="1" min="1" style="width: 70px; height: 28px; padding: 4px 8px; text-align: center; font-size: 12px;" onchange="saveAutomationSettings()">
@@ -808,7 +805,6 @@
 
                 // Sync toggles and looping values
                 if (config.automation) {
-                    document.getElementById('autoLoopingToggle').checked = config.automation.auto_looping === true;
                     const autoModeVal = config.automation.mode || 'rounds';
                     const autoModeRadio = document.querySelector(`input[name="stopCondition"][value="${autoModeVal}"]`);
                     if (autoModeRadio) autoModeRadio.checked = true;
@@ -2095,13 +2091,11 @@
 
         async function saveAutomationSettings() {
             if (isConfigLoading) return;
-            const autoLooping = document.getElementById('autoLoopingToggle').checked;
             const modeEl = document.querySelector('input[name="stopCondition"]:checked');
             const mode = modeEl ? modeEl.value : 'rounds';
             const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
             
             const auto = localConfig.automation || {};
-            auto.auto_looping = autoLooping;
             auto.mode = mode;
             auto.goal = goal;
             
@@ -2386,7 +2380,7 @@
                 currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
                 
                 const res = await api.startAutomation(mode, goal, currentConfig);
-                appendLog(`Start Automation result: ${res.message}`, 'success');
+                appendLog(`Start Automation result: ${res.status}`, 'success');
                 updateAutomationStats();
             } catch (err) {
                 appendLog('Failed to start automation: ' + err.message, 'error');
@@ -2397,7 +2391,7 @@
             try {
                 appendLog('Stopping automation...', 'warn');
                 const res = await api.stopAutomation();
-                appendLog(`Automation stop signal: ${res.message}`, 'success');
+                appendLog(`Automation stop signal: ${res.status}`, 'success');
                 updateAutomationStats();
             } catch (err) {
                 appendLog('Failed to stop automation: ' + err.message, 'error');
@@ -2445,7 +2439,7 @@
                 currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
                 
                 const res = await api.continueAutomation(mode, goal, currentConfig, clearPending);
-                appendLog(`Continue Automation status: ${res.message}`, 'success');
+                appendLog(`Continue Automation status: ${res.status}`, 'success');
                 updateAutomationStats();
             } catch (err) {
                 appendLog('Failed to continue automation: ' + err.message, 'error');

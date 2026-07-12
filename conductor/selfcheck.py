@@ -69,6 +69,19 @@ def main():
     assert switch is False
     print("[OK] Threshold logic passed")
 
+    # Mid-run switch decision (live pending counters)
+    print("Testing _should_switch...")
+    import time as _time
+    mgr.config = {"automation": {"loop_control": loop_ctrl}}
+    mgr._lc_time_threshold_start_time = _time.time()
+    mgr._pending_refused = 3
+    switch, action = mgr._should_switch()
+    assert switch is True and action == "next_profile", f"got {switch}, {action}"
+    mgr._pending_refused = 2
+    switch, action = mgr._should_switch()
+    assert switch is False, f"got {switch}, {action}"
+    print("[OK] _should_switch passed")
+
     # Stats endpoint test
     print("Testing automation stats endpoint...")
     response = client.get("/browser/automation/stats")

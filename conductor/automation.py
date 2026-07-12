@@ -237,6 +237,8 @@ class AutomationManager:
             self._lc_pending_resets = 0
             self._lc_time_threshold_start_time = time.time()
             
+        if self._lc_time_threshold_start_time is None:
+            self._lc_time_threshold_start_time = time.time()
         self.config = config
         
         if self.automation_status.get("start_time") is None or clear_pending:
@@ -289,6 +291,21 @@ class AutomationManager:
                     self.automation_status["inter_cycle_start_ts"] = None
                 if self._lc_cycle_start_time is None:
                     self._lc_cycle_start_time = time.time()
+
+                # Mid-run loop-control check: reacts to refusal/reset streaks
+                # and elapsed time even when no cycle ever succeeds (the
+                # success-branch check further down never runs in that case).
+                try:
+                    switch, action = self._should_switch()
+                    if switch:
+                        self._pending_refused = 0
+                        self._pending_resets = 0
+                        self.automation_status["pending_refused"] = 0
+                        self.automation_status["pending_resets"] = 0
+                        await self._handle_switch_action(action)
+                except Exception as e:
+                    logger.warning(f"Loop-control switch failed: {e}", exc_info=True)
+                    self._needs_new_chat = True
                 
                 is_initial = (cycles == 0) or self._needs_new_chat
                 if is_initial and self.ensure_service:
@@ -498,6 +515,20 @@ class AutomationManager:
 
         return False, "next_profile"
         
+    def _should_switch(self):
+        """Evaluate loop-control thresholds against the LIVE pending
+        counters. The pre-existing check in the success branch of _run_loop
+        only runs after a successful download; this helper lets the loop also
+        react to pure refusal/reset streaks (and elapsed time) that never
+        produce a success."""
+        loop_ctrl = self.config.get("automation", {}).get("loop_control", {})
+        elapsed = time.time() - self._lc_time_threshold_start_time if self._lc_time_threshold_start_time else 0
+        return self._check_loop_control_thresholds(loop_ctrl, {
+            "cycle_refused": self._pending_refused,
+            "cycle_resets": self._pending_resets,
+            "time_threshold_duration_sec": elapsed,
+        })
+
     async def _handle_switch_action(self, action):
         self._lc_time_threshold_start_time = time.time()
         if action == "next_profile":
@@ -532,6 +563,10 @@ class AutomationManager:
         
         resp = await self._get("/engine/profiles")
         profiles = filter_ghost_profiles(resp.json().get("profiles", []))
+        if not profiles:
+            logger.error("Quota hit but no usable profiles exist; ending run.")
+            self._session_lost = True
+            return
         
         cur = self.automation_status["current_account_id"]
         idx = -1
