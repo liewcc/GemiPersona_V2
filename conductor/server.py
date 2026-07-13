@@ -153,14 +153,13 @@ class AutomationRequest(BaseModel):
 
 @app.post("/browser/automation/start")
 async def start_automation(req: AutomationRequest):
-    automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
-    return {"status": "success"}
+    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    return {"status": "success" if ok else "already_running"}
 
 @app.post("/browser/automation/continue")
 async def continue_automation(req: AutomationRequest):
-    req.clear_pending = False
-    automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
-    return {"status": "success"}
+    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    return {"status": "success" if ok else "already_running"}
 
 @app.post("/browser/automation/stop")
 async def stop_automation():

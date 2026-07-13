@@ -203,6 +203,7 @@ class AutomationManager:
             "mode": "rounds",
             "goal": 0,
             "cycles": 0,
+            "current_step": "idle",
             "successes": 0,
             "refusals": 0,
             "resets": 0,
@@ -242,9 +243,9 @@ class AutomationManager:
         async with httpx.AsyncClient(timeout=300.0) as client:
             return await client.get(url)
 
-    def start(self, mode: str, goal: int, config: dict, clear_pending: bool):
+    def start(self, mode: str, goal: int, config: dict, clear_pending: bool) -> bool:
         if self.automation_status["is_running"]:
-            return
+            return False
             
         self._stop_event.clear()
         
@@ -281,6 +282,7 @@ class AutomationManager:
                                extra={"mode": mode, "goal": goal})
             
         self._task = asyncio.create_task(self._run_loop())
+        return True
 
     def stop(self):
         self._stop_event.set()
@@ -293,6 +295,10 @@ class AutomationManager:
         
     async def _run_loop(self):
         try:
+            def _step(name):
+                self.automation_status["current_step"] = name
+                logger.info(f"[automation] step: {name}")
+
             if self.ensure_service:
                 ok = await self.ensure_service()
                 if not ok:
@@ -344,13 +350,16 @@ class AutomationManager:
                 try:
                     if is_initial:
                         cfg = _load_root_config()
+                        _step("engine_start")
                         await self._post("/engine/start", {"headless": bool(cfg.get("headless", False)), "active_user": self.automation_status["current_account_id"], "active_service": cfg.get("active_service") or "gemini"})
+                        _step("new_chat")
                         await self._post("/browser/new_chat", {})
                         if self._stop_event.is_set(): break
                         await asyncio.sleep(2)
                         
                         try:
                             logger.debug("Performing live discovery scan at new chat...")
+                            _step("discover")
                             discovery_resp = await self._post("/browser/discover")
                             discovery_res = discovery_resp.json()
                             
@@ -399,6 +408,7 @@ class AutomationManager:
                             else:
                                 logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
                             
+                            _step("apply_settings")
                             await self._post("/browser/apply_settings", {
                                 "model": model_to_apply,
                                 "tool": tool_to_apply,
@@ -407,11 +417,13 @@ class AutomationManager:
                             
                             has_files = self.config.get("selected_files")
                             if has_files:
+                                _step("attach_files")
                                 for f_path in has_files:
                                     await self._post("/browser/file/add", {"path": f_path})
                         except Exception as e:
                             logger.warning(f"Settings setup failed: {e}")
 
+                        _step("prompt")
                         ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
                         self._ar_ratio, self._ar_dynamic, self._ar_idx = ratio, ar_dynamic, ar_idx
                         final_prompt, clean_prompt = _inject_ratio(self.config.get("prompt", ""), ratio)
@@ -420,15 +432,18 @@ class AutomationManager:
                         await self._post("/browser/prompt", {"text": final_prompt})
                         if self._stop_event.is_set(): break
                         
+                        _step("submit")
                         await self._post("/browser/submit", {})
                         if self._stop_event.is_set(): break
                         self._needs_new_chat = False
                     else:
+                        _step("redo")
                         redo_resp = await self._post("/browser/redo", {})
                         if redo_resp.status_code != 200 or redo_resp.json().get("status") != "success":
                             self._record_reset()
                             continue
                     
+                    _step("wait_response")
                     wait_resp = await self._post("/browser/wait_response", {"timeout": 180})
                     wait_data = wait_resp.json()
                     
@@ -441,6 +456,7 @@ class AutomationManager:
                                 "padding": self.config.get("name_padding", 2),
                                 "start": self.config.get("name_start", 1)
                             }
+                            _step("download")
                             dl_resp = await self._post("/browser/download", dl_cfg)
                             dl_data = dl_resp.json()
                             
@@ -544,6 +560,7 @@ class AutomationManager:
             logger.error(f"Automation loop error: {traceback.format_exc()}")
         finally:
             self.automation_status["is_running"] = False
+            self.automation_status["current_step"] = "idle"
             s = self.automation_status
             health_db.record_event(
                 self._run_id, "run_end", account=s.get("current_account_id"),
