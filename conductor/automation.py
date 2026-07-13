@@ -192,12 +192,9 @@ class AutomationManager:
         self._task = None
         
         self._cycle_start_time = None
-        self._lc_cycle_start_time = None
         
         self._pending_refused = 0
         self._pending_resets = 0
-        self._lc_pending_refused = 0
-        self._lc_pending_resets = 0
         
         self._lc_time_threshold_start_time = None
         self._needs_new_chat = True
@@ -236,8 +233,6 @@ class AutomationManager:
             self._pending_resets = 0
             self.automation_status["pending_refused"] = 0
             self.automation_status["pending_resets"] = 0
-            self._lc_pending_refused = 0
-            self._lc_pending_resets = 0
             self._lc_time_threshold_start_time = time.time()
             
         if self._lc_time_threshold_start_time is None:
@@ -296,8 +291,6 @@ class AutomationManager:
                     self._cycle_start_time = time.time()
                     self.automation_status["current_cycle_start_ts"] = self._cycle_start_time
                     self.automation_status["inter_cycle_start_ts"] = None
-                if self._lc_cycle_start_time is None:
-                    self._lc_cycle_start_time = time.time()
 
                 # Mid-run loop-control check: reacts to refusal/reset streaks
                 # and elapsed time even when no cycle ever succeeds (the
@@ -424,7 +417,6 @@ class AutomationManager:
                                     self.automation_status["cycles"] += 1
 
                                     cycle_dur = time.time() - self._cycle_start_time
-                                    lc_dur = time.time() - self._lc_cycle_start_time
                                     health_db.record_event(
                                         self._run_id, "success",
                                         account=self.automation_status["current_account_id"],
@@ -434,8 +426,6 @@ class AutomationManager:
                                     
                                     cycle_refused_snap = self._pending_refused
                                     cycle_resets_snap = self._pending_resets
-                                    lc_refused_snap = self._lc_pending_refused
-                                    lc_resets_snap = self._lc_pending_resets
                                     
                                     self._pending_refused = 0
                                     self._pending_resets = 0
@@ -445,10 +435,6 @@ class AutomationManager:
                                     self._cycle_start_time = None
                                     self.automation_status["current_cycle_start_ts"] = None
                                     self.automation_status["inter_cycle_start_ts"] = time.time()
-                                    
-                                    self._lc_pending_refused = 0
-                                    self._lc_pending_resets = 0
-                                    self._lc_cycle_start_time = None
                                     
                                     result = {
                                         "cycle_duration_sec": cycle_dur,
@@ -479,7 +465,6 @@ class AutomationManager:
                                     extra={"text": (text or "")[:200]})
                                 self._pending_refused += 1
                                 self.automation_status["pending_refused"] = self._pending_refused
-                                self._lc_pending_refused += 1
                             elif cls_status == "quota":
                                 await self._handle_quota()
                             else:
@@ -517,7 +502,6 @@ class AutomationManager:
         self.automation_status["cycles"] += 1
         self._pending_resets += 1
         self.automation_status["pending_resets"] = self._pending_resets
-        self._lc_pending_resets += 1
         self._needs_new_chat = True
         health_db.record_event(
             self._run_id, "reset",

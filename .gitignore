@@ -25,3 +25,6 @@ HANDOFF.md
 
 # Runtime state written by main.js hide-cli IPC handlers
 /data/
+
+# Project agent instructions (local-only)
+CLAUDE.md
