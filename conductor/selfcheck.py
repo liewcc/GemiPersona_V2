@@ -82,6 +82,28 @@ def main():
     assert switch is False, f"got {switch}, {action}"
     print("[OK] _should_switch passed")
 
+    # Aspect ratio resolution + injection
+    print("Testing aspect ratio helpers...")
+    from automation import _resolve_aspect_ratio, _inject_ratio
+    r, dyn, idx = _resolve_aspect_ratio({"fixed_aspect_ratio": "16:9 (Landscape)"})
+    assert r == "16:9 (Landscape)" and dyn is False, f"got {r}, {dyn}"
+    r, dyn, idx = _resolve_aspect_ratio({"fixed_aspect_ratio": "None"})
+    assert r == "", f"got {r}"
+    pm = {"enabled": True, "items": [
+        {"ratio": "16:9 (Landscape)", "target": 2, "current": 2},
+        {"ratio": "1:1 (Square)", "target": 3, "current": 1},
+    ]}
+    r, dyn, idx = _resolve_aspect_ratio({"prompt_matrix": pm, "fixed_aspect_ratio": "4:3"})
+    assert r == "1:1 (Square)" and dyn is True and idx == 1, f"got {r}, {dyn}, {idx}"
+    pm["items"][1]["current"] = 3
+    r, dyn, idx = _resolve_aspect_ratio({"prompt_matrix": pm})
+    assert r == "" and idx == -1, f"got {r}, {idx}"
+    final, clean = _inject_ratio("Aspect Ratio: old\n\nA cat", "1:1 (Square)")
+    assert final == "Aspect Ratio: 1:1 (Square)\n\nA cat" and clean == "A cat", f"got {final!r}"
+    final, clean = _inject_ratio("A cat", "")
+    assert final == "A cat" and clean == "A cat", f"got {final!r}"
+    print("[OK] Aspect ratio helpers passed")
+
     # Stats endpoint test
     print("Testing automation stats endpoint...")
     response = client.get("/browser/automation/stats")

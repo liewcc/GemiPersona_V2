@@ -3,6 +3,7 @@ import time
 import httpx
 import os
 import json
+import re
 import logging
 import subprocess
 import traceback
@@ -80,6 +81,29 @@ def write_png_metadata(paths, config):
                 img.save(p, "PNG", pnginfo=meta)
         except Exception as e:
             logger.warning(f"PNG metadata write failed for {p}: {e}")
+
+def _resolve_aspect_ratio(cfg):
+    """Mirror of the manual Submit resolution in setup.html: dynamic mode
+    (prompt_matrix.enabled) uses the first matrix row with current < target;
+    fixed mode uses fixed_aspect_ratio unless it is 'None'.
+    Returns (ratio, dynamic, idx); ratio is '' when nothing should be injected."""
+    pm = cfg.get("prompt_matrix") or {}
+    if pm.get("enabled"):
+        for i, it in enumerate(pm.get("items") or []):
+            if (it.get("current") or 0) < (it.get("target") or 1):
+                return (it.get("ratio") or "", True, i)
+        return ("", True, -1)
+    fixed = cfg.get("fixed_aspect_ratio") or ""
+    return (fixed if fixed != "None" else "", False, -1)
+
+
+def _inject_ratio(prompt, ratio):
+    """Strip any existing 'Aspect Ratio:' prefix, prepend the active one.
+    Same regex as the manual path in setup.html.
+    Returns (final_prompt, clean_prompt)."""
+    clean = re.sub(r"^Aspect Ratio:.*?\n\n", "", prompt or "", flags=re.IGNORECASE | re.DOTALL)
+    return (f"Aspect Ratio: {ratio}\n\n{clean}" if ratio else clean, clean)
+
 
 def filter_ghost_profiles(profiles: list) -> list:
     """Drop profile entries whose browser_user_data directory doesn't exist on disk."""
@@ -203,6 +227,9 @@ class AutomationManager:
         self._needs_new_chat = True
         self._session_lost = False
         self._run_id = None
+        self._ar_ratio = ""
+        self._ar_dynamic = False
+        self._ar_idx = -1
         health_db.init_db()
         
     async def _post(self, path, json_data=None):
@@ -385,7 +412,12 @@ class AutomationManager:
                         except Exception as e:
                             logger.warning(f"Settings setup failed: {e}")
 
-                        await self._post("/browser/prompt", {"text": self.config.get("prompt", "")})
+                        ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
+                        self._ar_ratio, self._ar_dynamic, self._ar_idx = ratio, ar_dynamic, ar_idx
+                        final_prompt, clean_prompt = _inject_ratio(self.config.get("prompt", ""), ratio)
+                        self.config["aspect_ratio"] = ratio
+                        self.config["prompt_clean"] = clean_prompt
+                        await self._post("/browser/prompt", {"text": final_prompt})
                         if self._stop_event.is_set(): break
                         
                         await self._post("/browser/submit", {})
@@ -427,6 +459,23 @@ class AutomationManager:
                                         cycle_index=self.automation_status["cycles"],
                                         duration_sec=cycle_dur,
                                         filename=os.path.basename(saved_paths[0]) if saved_paths else None)
+
+                                    if self._ar_dynamic and self._ar_idx >= 0:
+                                        # Advance the dynamic ratio matrix; persist through the
+                                        # engine so writes share one code path with the UI.
+                                        try:
+                                            pm = _load_root_config().get("prompt_matrix") or {}
+                                            items = pm.get("items") or []
+                                            if self._ar_idx < len(items):
+                                                it = items[self._ar_idx]
+                                                it["current"] = (it.get("current") or 0) + 1
+                                                await self._post("/engine/config", {"prompt_matrix": pm})
+                                                if it["current"] >= (it.get("target") or 1):
+                                                    # Row complete: force a new chat so the next
+                                                    # cycle re-resolves and injects the next ratio.
+                                                    self._needs_new_chat = True
+                                        except Exception as e:
+                                            logger.warning(f"prompt_matrix advance failed: {e}")
                                     
                                     cycle_refused_snap = self._pending_refused
                                     cycle_resets_snap = self._pending_resets
