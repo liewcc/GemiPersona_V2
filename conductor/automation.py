@@ -89,6 +89,14 @@ def filter_ghost_profiles(profiles: list) -> list:
         if p.get("dir") and os.path.isdir(os.path.join(user_data_root, p["dir"]))
     ]
 
+def _load_root_config():
+    try:
+        with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 async def do_account_switch(get_engine_url_fn, ensure_service_fn, username: str, profile_dir: str | None = None) -> dict:
     """The proven 6-step account switch (stop -> persist config -> kill orphan
     chromium -> remove sandbox junctions -> sleep -> start), shared by the
@@ -133,12 +141,7 @@ async def do_account_switch(get_engine_url_fn, ensure_service_fn, username: str,
 
         await asyncio.sleep(1)
 
-        cfg = {}
-        try:
-            with open(os.path.join(BASE_DIR, "config.json"), encoding="utf-8") as f:
-                cfg = json.load(f)
-        except Exception:
-            pass
+        cfg = _load_root_config()
         headless = bool(cfg.get("headless", False))
         active_service = cfg.get("active_service")
         start_payload = {"headless": headless, "active_user": username}
@@ -313,7 +316,8 @@ class AutomationManager:
                 
                 try:
                     if is_initial:
-                        await self._post("/engine/start", {"headless": False, "active_user": self.automation_status["current_account_id"], "active_service": "gemini"})
+                        cfg = _load_root_config()
+                        await self._post("/engine/start", {"headless": bool(cfg.get("headless", False)), "active_user": self.automation_status["current_account_id"], "active_service": cfg.get("active_service") or "gemini"})
                         await self._post("/browser/new_chat", {})
                         if self._stop_event.is_set(): break
                         await asyncio.sleep(2)

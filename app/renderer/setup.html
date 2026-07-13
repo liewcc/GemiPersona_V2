@@ -928,6 +928,31 @@
             }
         }
 
+        async function stopAutomationIfRunning() {
+            // Returns true when it is safe to proceed with the stop action.
+            let stats = null;
+            try { stats = await api.getAutomationStats(); } catch (e) { return true; }
+            if (!stats || !stats.is_running) return true;
+            if (!confirm('Automation loop is running. Stop the loop first, then continue?')) return false;
+            try {
+                await api.stopAutomation();
+                appendLog('Automation stop requested...', 'warn');
+                // Best-effort wait; once the stop flag is set the loop cannot
+                // restart the browser, so proceeding after timeout is safe.
+                for (let i = 0; i < 20; i++) {
+                    await new Promise(r => setTimeout(r, 500));
+                    try {
+                        const s = await api.getAutomationStats();
+                        if (!s || !s.is_running) break;
+                    } catch (e) { break; }
+                }
+            } catch (err) {
+                appendLog('Failed to stop automation: ' + err.message, 'error');
+                return false;
+            }
+            return true;
+        }
+
         async function toggleEngine() {
             const btn = document.getElementById('engineCardBtn');
             if (!btn) return;
@@ -943,6 +968,7 @@
                     await window.electronAPI.startEngineService();
                     appendLog('Engine service started.', 'success');
                 } else {
+                    if (!await stopAutomationIfRunning()) return;
                     appendLog('Stopping engine and browser...', 'warn');
                     // Stop browser first gracefully if running
                     try {
@@ -987,6 +1013,7 @@
                     await api.startEngine({ headless, active_user: _cfg.active_user || null, active_service: _cfg.active_service || null });
                     appendLog('Browser started.', 'success');
                 } else {
+                    if (!await stopAutomationIfRunning()) return;
                     // Set flag BEFORE the async stop so any concurrent poll
                     // that fires during the await cannot see autoStartedBrowser=false
                     // and trigger an unwanted autostart.
