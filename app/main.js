@@ -312,7 +312,7 @@ let isStoppingEngine = false;
 function startEngine() {
   console.log('Starting FastAPI conductor service...');
   const projectRoot = path.join(__dirname, '..');
-  const pythonExecutable = path.join(projectRoot, '.venv', 'Scripts', 'pythonw.exe');
+  const pythonExecutable = path.join(projectRoot, '.python_venv', 'pythonw.exe');
 
   // Open log file for appending conductor output
   let logStream;
@@ -326,6 +326,7 @@ function startEngine() {
     cwd: projectRoot,
     env: {
       ...process.env,
+      PLAYWRIGHT_BROWSERS_PATH: path.join(projectRoot, '.playwright_browsers')
     },
     stdio: ['ignore', 'pipe', 'pipe']   // stdin=ignore, stdout/stderr=pipe
   });

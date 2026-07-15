@@ -44,7 +44,7 @@ _spawn_lock = asyncio.Lock()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENGINE_DIR = os.path.join(BASE_DIR, "Gemi_Engine_V2")
 CONFIG_PATH = os.path.join(BASE_DIR, "engine_config.json")
-ENGINE_VENV_PYTHON = os.path.join(ENGINE_DIR, ".venv", "Scripts", "pythonw.exe")
+ENGINE_VENV_PYTHON = os.path.join(BASE_DIR, ".python_venv", "pythonw.exe")
 ENGINE_SCRIPT = "engine_service.py"
 ENGINE_OUT = os.path.join(BASE_DIR, "engine_svc.out")
 
