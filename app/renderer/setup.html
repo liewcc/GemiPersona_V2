@@ -2668,6 +2668,11 @@
                 currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
                 
                 const res = await api.continueAutomation(mode, goal, currentConfig, clearPending);
+                if (res.status === 'goal_reached') {
+                    alert(res.message || 'Goal Protection: The target goal has already been reached. Please increase the Target Goal to continue.');
+                    appendLog(`Continue Automation failed: target goal already reached`, 'error');
+                    return;
+                }
                 appendLog(`Continue Automation status: ${res.status}`, 'success');
                 updateAutomationStats();
             } catch (err) {
@@ -2676,6 +2681,23 @@
         }
 
         async function confirmContinueAutomation() {
+            // Goal Protection Pre-check
+            const modeEl = document.querySelector('input[name="stopCondition"]:checked');
+            const mode = modeEl ? modeEl.value : 'rounds';
+            const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
+            
+            const statCycles = parseInt(document.getElementById('statCycles').textContent, 10) || 0;
+            const statImages = parseInt(document.getElementById('statImages').textContent, 10) || 0;
+            
+            if (mode === 'rounds' && statCycles >= goal) {
+                alert(`Goal Protection: The target goal of ${goal} Cycle(s) has already been reached (Current Cycles: ${statCycles}). Please increase the Target Goal before continuing.`);
+                return;
+            }
+            if (mode === 'images' && statImages >= goal) {
+                alert(`Goal Protection: The target goal of ${goal} Image(s) has already been reached (Current Images: ${statImages}). Please increase the Target Goal before continuing.`);
+                return;
+            }
+
             const clearPending = document.getElementById('continue_opt_reset').checked;
             await executeContinueAutomation(clearPending);
         }
@@ -3140,8 +3162,25 @@
             loadConfigFromServer();
             bindLcChangeEvents();
             refreshLogs(); // Fetch history immediately on load
-            
             refreshVersionBadges();
+            
+            // Retry stats update immediately on startup until it succeeds
+            let startupStatsRetries = 0;
+            const startupStatsInterval = setInterval(async () => {
+                try {
+                    const stats = await api.getAutomationStats();
+                    if (stats) {
+                        clearInterval(startupStatsInterval);
+                        await updateAutomationStats();
+                    }
+                } catch (e) {
+                    startupStatsRetries++;
+                    if (startupStatsRetries >= 20) { // stop after 10 seconds
+                        clearInterval(startupStatsInterval);
+                    }
+                }
+            }, 500);
+
             setInterval(() => {
                 updateAccountStatus();
                 updateAutomationStats();

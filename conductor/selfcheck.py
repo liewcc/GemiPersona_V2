@@ -29,7 +29,7 @@ def main():
             importlib.import_module(name)
             print(f"[OK] {name} imported successfully")
         except ModuleNotFoundError as e:
-            if e.name in ("torch", "cv2", "playwright"):
+            if e.name in ("torch", "cv2", "playwright", "tkinter", "_tkinter", "pystray"):
                 print(f"[NOTE] {name} skipped (heavy dep '{e.name}' not installed yet)")
             else:
                 print(f"[FAIL] Failed to import {name}: {e}")

@@ -236,6 +236,26 @@ class AutomationManager:
         self._ar_dynamic = False
         self._ar_idx = -1
         health_db.init_db()
+
+        # Load stats of the last run from database upon startup
+        try:
+            last_runs = health_db.list_runs(limit=1)
+            if last_runs:
+                last_run = last_runs[0]
+                self.automation_status.update({
+                    "successes": last_run.get("successes") or 0,
+                    "refusals": last_run.get("refusals") or 0,
+                    "resets": last_run.get("resets") or 0,
+                })
+                self.automation_status["cycles"] = (
+                    self.automation_status["successes"]
+                    + self.automation_status["refusals"]
+                    + self.automation_status["resets"]
+                )
+                self._run_id = last_run.get("run_id")
+        except Exception as e:
+            logger.warning(f"Failed to load last run stats from db on startup: {e}")
+
         
     async def _post(self, path, json_data=None):
         url = self.get_engine_url() + path
@@ -253,7 +273,7 @@ class AutomationManager:
         except Exception as e:
             logger.error(f"Failed to log to engine: {e}")
 
-    def start(self, mode: str, goal: int, config: dict, clear_pending: bool) -> bool:
+    def start(self, mode: str, goal: int, config: dict, clear_pending: bool, is_continue: bool = False) -> bool:
         if self.automation_status["is_running"]:
             return False
             
@@ -263,10 +283,10 @@ class AutomationManager:
             "is_running": True,
             "mode": mode,
             "goal": goal,
-            "cycles": 0 if clear_pending else self.automation_status.get("cycles", 0),
-            "successes": 0 if clear_pending else self.automation_status.get("successes", 0),
-            "refusals": 0 if clear_pending else self.automation_status.get("refusals", 0),
-            "resets": 0 if clear_pending else self.automation_status.get("resets", 0)
+            "cycles": self.automation_status.get("cycles", 0) if is_continue else 0,
+            "successes": self.automation_status.get("successes", 0) if is_continue else 0,
+            "refusals": self.automation_status.get("refusals", 0) if is_continue else 0,
+            "resets": self.automation_status.get("resets", 0) if is_continue else 0
         })
         
         if clear_pending:
@@ -280,16 +300,22 @@ class AutomationManager:
             self._lc_time_threshold_start_time = time.time()
         self.config = config
         
-        if self.automation_status.get("start_time") is None or clear_pending:
+        if self.automation_status.get("start_time") is None or (clear_pending and not is_continue):
             from datetime import datetime
             self.automation_status["start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         self.automation_status["initial_user"] = config.get("active_user")
         self.automation_status["current_account_id"] = config.get("active_user")
-        self._run_id = time.strftime("%Y%m%d-%H%M%S")
-        health_db.record_event(self._run_id, "run_start",
-                               account=config.get("active_user"),
-                               extra={"mode": mode, "goal": goal})
+
+        if not is_continue or not self._run_id:
+            self._run_id = time.strftime("%Y%m%d-%H%M%S")
+            health_db.record_event(self._run_id, "run_start",
+                                   account=config.get("active_user"),
+                                   extra={"mode": mode, "goal": goal})
+        else:
+            health_db.record_event(self._run_id, "run_resume",
+                                   account=config.get("active_user"),
+                                   extra={"mode": mode, "goal": goal})
             
         self._task = asyncio.create_task(self._run_loop())
         return True

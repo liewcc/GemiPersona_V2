@@ -487,6 +487,24 @@
         document.addEventListener('DOMContentLoaded', async () => {
             restoreStatusCardsCache();
             await initializePage();
+            
+            // Retry stats update immediately on startup until it succeeds
+            let startupStatsRetries = 0;
+            const startupStatsInterval = setInterval(async () => {
+                try {
+                    const stats = await api.getAutomationStats();
+                    if (stats) {
+                        clearInterval(startupStatsInterval);
+                        await updateAutomationStats();
+                    }
+                } catch (e) {
+                    startupStatsRetries++;
+                    if (startupStatsRetries >= 20) { // stop after 10 seconds
+                        clearInterval(startupStatsInterval);
+                    }
+                }
+            }, 500);
+
             // Start checking status periodically
             setInterval(async () => {
                 await updateAccountStatus();
@@ -497,10 +515,11 @@
         async function initializePage() {
             setLoading(true);
             try {
+                // Catch errors individually to prevent entire block failure if one check (like stats) fails when engine is offline
                 await Promise.all([
-                    updateAccountStatus(),
-                    updateAutomationStats(),
-                    loadProfiles()
+                    updateAccountStatus().catch(err => console.error("Initial account status check failed:", err)),
+                    updateAutomationStats().catch(err => console.error("Initial automation stats check failed:", err)),
+                    loadProfiles().catch(err => console.error("Initial profiles load failed:", err))
                 ]);
             } catch (err) {
                 console.error(err);

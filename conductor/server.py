@@ -153,12 +153,29 @@ class AutomationRequest(BaseModel):
 
 @app.post("/browser/automation/start")
 async def start_automation(req: AutomationRequest):
-    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending, is_continue=False)
     return {"status": "success" if ok else "already_running"}
 
 @app.post("/browser/automation/continue")
 async def continue_automation(req: AutomationRequest):
-    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending)
+    # Goal Protection Check
+    mode = req.mode
+    goal = req.goal
+    cycles = automation_manager.automation_status.get("cycles", 0)
+    successes = automation_manager.automation_status.get("successes", 0)
+    
+    if mode == "rounds" and cycles >= goal:
+        return {
+            "status": "goal_reached",
+            "message": f"Goal Protection: The target goal of {goal} Cycle(s) has already been reached (Current Cycles: {cycles}). Please increase the Target Goal."
+        }
+    if mode == "images" and successes >= goal:
+        return {
+            "status": "goal_reached",
+            "message": f"Goal Protection: The target goal of {goal} Image(s) has already been reached (Current Images: {successes}). Please increase the Target Goal."
+        }
+
+    ok = automation_manager.start(req.mode, req.goal, req.config, req.clear_pending, is_continue=True)
     return {"status": "success" if ok else "already_running"}
 
 @app.post("/browser/automation/stop")
