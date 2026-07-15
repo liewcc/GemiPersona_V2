@@ -1399,9 +1399,23 @@
                         if (email === currentVal) opt.selected = true;
                         select.appendChild(opt);
                     });
+
+                    // Self-healing: if config's active_profile and active_user are out of sync, update config.json
+                    const cfg = await api.getConfig().catch(() => ({}));
+                    if (cfg.active_profile) {
+                        const matchedProfile = res.profiles.find(p => p.dir === cfg.active_profile);
+                        if (matchedProfile && matchedProfile.email && matchedProfile.email !== cfg.active_user) {
+                            console.log(`Syncing active_user in config to match active_profile ${cfg.active_profile}:`, matchedProfile.email);
+                            try {
+                                await api.saveConfig({ active_user: matchedProfile.email });
+                            } catch (err) {
+                                console.error("Failed to auto-sync active_user in config:", err);
+                            }
+                        }
+                    }
                 }
             } catch(e) {
-                console.error('Failed to load profiles');
+                console.error('Failed to load profiles', e);
             }
         }
 

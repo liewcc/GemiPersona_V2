@@ -667,6 +667,21 @@
 
                 const res = await api.getProfilesStatus();
                 _profiles = res.profiles || [];
+
+                // Self-healing: if config's active_profile and active_user are out of sync, update config.json
+                if (_activeProfile && _profiles.length > 0) {
+                    const matchedProfile = _profiles.find(p => p.dir === _activeProfile);
+                    if (matchedProfile && matchedProfile.email && matchedProfile.email !== _activeUser) {
+                        console.log(`Syncing active_user in config to match active_profile ${_activeProfile}:`, matchedProfile.email);
+                        try {
+                            const newConfig = await api.saveConfig({ active_user: matchedProfile.email });
+                            _activeUser = newConfig.active_user;
+                        } catch (err) {
+                            console.error("Failed to auto-sync active_user in config:", err);
+                        }
+                    }
+                }
+
                 renderProfilesTable();
             } catch (err) {
                 console.error(err);
@@ -690,7 +705,8 @@
                 const email = p.email || '';
                 const name = p.name || '';
 
-                const isActive = (dir === _activeProfile || email === _activeUser);
+                const hasActiveProfileMatch = _profiles.some(p => p.dir === _activeProfile);
+                const isActive = hasActiveProfileMatch ? (dir === _activeProfile) : (email === _activeUser);
 
                 const tr = document.createElement('tr');
                 if (_reorderMode) {

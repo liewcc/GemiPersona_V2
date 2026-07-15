@@ -250,7 +250,16 @@ const api = {
     },
 
     deleteProfile(profileName) {
-        return this.request('/engine/profiles/delete', 'POST', { profile: profileName });
+        // Try the live engine first; fall back to direct Electron delete when offline
+        return this.request('/engine/profiles/delete', 'POST', { profile: profileName }).catch((err) => {
+            if (window.electronAPI && window.electronAPI.deleteProfile) {
+                return window.electronAPI.deleteProfile(profileName).then(res => {
+                    if (res && res.success) return { status: 'success' };
+                    throw new Error(res ? res.error : 'IPC deletion failed');
+                });
+            }
+            throw err;
+        });
     },
 
 

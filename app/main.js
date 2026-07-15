@@ -518,6 +518,82 @@ ipcMain.handle('write-login-lookup', async (event, data) => {
   }
 });
 
+ipcMain.handle('delete-profile', async (event, profileName) => {
+  try {
+    const dataDir = path.join(__dirname, '..', 'Gemi_Engine_V2', 'browser_user_data');
+    const profilePath = path.join(dataDir, profileName);
+    
+    // 1. Delete profile directory from disk
+    if (fs.existsSync(profilePath)) {
+      fs.rmSync(profilePath, { recursive: true, force: true });
+    }
+    
+    // 2. Remove from Local State
+    if (fs.existsSync(ENGINE_LOCAL_STATE_PATH)) {
+      const content = fs.readFileSync(ENGINE_LOCAL_STATE_PATH, 'utf-8');
+      if (content.trim().length > 0) {
+        const localState = JSON.parse(content);
+        let modified = false;
+        
+        if (localState.profile) {
+          const profile = localState.profile;
+          if (profile.info_cache && profile.info_cache[profileName]) {
+            delete profile.info_cache[profileName];
+            modified = true;
+          }
+          if (profile.profiles_order) {
+            const index = profile.profiles_order.indexOf(profileName);
+            if (index !== -1) {
+              profile.profiles_order.splice(index, 1);
+              modified = true;
+            }
+          }
+          if (profile.last_active_profiles) {
+            const index = profile.last_active_profiles.indexOf(profileName);
+            if (index !== -1) {
+              profile.last_active_profiles.splice(index, 1);
+              modified = true;
+            }
+          }
+          if (profile.last_used === profileName) {
+            profile.last_used = (profile.profiles_order && profile.profiles_order.length > 0) ? profile.profiles_order[0] : '';
+            modified = true;
+          }
+        }
+        
+        if (localState.variations_google_groups && localState.variations_google_groups[profileName]) {
+          delete localState.variations_google_groups[profileName];
+          modified = true;
+        }
+        
+        if (modified) {
+          const tmpStatePath = ENGINE_LOCAL_STATE_PATH + '.tmp';
+          fs.writeFileSync(tmpStatePath, JSON.stringify(localState, null, 4), 'utf-8');
+          fs.renameSync(tmpStatePath, ENGINE_LOCAL_STATE_PATH);
+        }
+      }
+    }
+    
+    // 3. Clear from config.json if active
+    if (fs.existsSync(CONFIG_PATH)) {
+      const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+      if (content.trim().length > 0) {
+        const config = JSON.parse(content);
+        if (config.active_profile === profileName) {
+          config.active_profile = null;
+          config.active_user = '';
+          fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4), 'utf-8');
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('delete-profile IPC error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Helper to check if a string matches "Profile \d+"
 function isNumberedProfile(dir) {
   return /^Profile \d+$/.test(dir || '');
