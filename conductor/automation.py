@@ -145,7 +145,7 @@ async def do_account_switch(get_engine_url_fn, ensure_service_fn, username: str,
                 [
                     "powershell", "-NoProfile", "-Command",
                     "Get-Process -Name chrome -ErrorAction SilentlyContinue | "
-                    "Where-Object { $_.Path -like '*ms-playwright*' } | "
+                    "Where-Object { $_.Path -like '*playwright*' } | "
                     "Stop-Process -Force -ErrorAction SilentlyContinue",
                 ],
                 timeout=15,
@@ -168,7 +168,11 @@ async def do_account_switch(get_engine_url_fn, ensure_service_fn, username: str,
         cfg = _load_root_config()
         headless = bool(cfg.get("headless", False))
         active_service = cfg.get("active_service")
-        start_payload = {"headless": headless, "active_user": username}
+        start_payload = {
+            "headless": headless,
+            "active_user": username,
+            "profile_name": profile_dir,
+        }
         if active_service:
             start_payload["active_service"] = active_service
         start_resp = await client.post(f"{base}/engine/start", json=start_payload)
@@ -351,7 +355,12 @@ class AutomationManager:
                     if is_initial:
                         cfg = _load_root_config()
                         _step("engine_start")
-                        await self._post("/engine/start", {"headless": bool(cfg.get("headless", False)), "active_user": self.automation_status["current_account_id"], "active_service": cfg.get("active_service") or "gemini"})
+                        await self._post("/engine/start", {
+                            "headless": bool(cfg.get("headless", False)),
+                            "active_user": self.automation_status["current_account_id"],
+                            "profile_name": cfg.get("active_profile"),
+                            "active_service": cfg.get("active_service") or "gemini"
+                        })
                         _step("new_chat")
                         await self._post("/browser/new_chat", {})
                         if self._stop_event.is_set(): break

@@ -1010,7 +1010,7 @@
                     appendLog(`Starting browser (headless=${headless})...`, 'info');
                     // Start into the persisted active profile (like Gemi_MCP_V2), not Chrome's default.
                     const _cfg = await api.getConfig().catch(() => ({}));
-                    await api.startEngine({ headless, active_user: _cfg.active_user || null, active_service: _cfg.active_service || null });
+                    await api.startEngine({ headless, active_user: _cfg.active_user || null, profile_name: _cfg.active_profile || null, active_service: _cfg.active_service || null });
                     appendLog('Browser started.', 'success');
                 } else {
                     if (!await stopAutomationIfRunning()) return;
@@ -1295,9 +1295,19 @@
                 const user = cfg.active_user;
                 const dir = cfg.active_profile || null;
                 if (!user) { appendLog('No active profile to re-login.', 'error'); return; }
-                appendLog(`Re-logging current profile: ${user}...`, 'info');
-                const res = await api.accountSwitch(user, dir);
-                appendLog(`Re-login complete: ${res.active_user || user}`, 'success');
+                
+                const choice = confirm(`Do you want to open a headed Chrome browser to manually sign in and refresh the session for ${user} (${dir})?\n\nChoose OK to open headed browser for manual login.\nChoose Cancel to perform a quick headless session reload.`);
+                if (choice) {
+                    appendLog('Stopping main browser...', 'info');
+                    await api.stopEngine();
+                    appendLog(`Opening manual login browser for ${user} (${dir})...`, 'info');
+                    await api.startRegistrationMode({ profile_name: dir });
+                    appendLog('Headed browser opened. Please sign in to Google, then close it.', 'success');
+                } else {
+                    appendLog(`Re-logging current profile (headless): ${user}...`, 'info');
+                    const res = await api.accountSwitch(user, dir);
+                    appendLog(`Re-login complete: ${res.active_user || user}`, 'success');
+                }
                 setTimeout(updateAccountStatus, 1500);
             } catch (err) {
                 appendLog('Re-login failed: ' + err.message, 'error');
@@ -2893,7 +2903,7 @@
         async function triggerOpenDownloadFolder(event) {
             if (event) event.preventDefault();
             try {
-                const config = await api.getConfig();
+                const config = await window.electronAPI.readConfig();
                 const saveDir = config.save_dir;
                 if (saveDir) {
                     const result = await window.electronAPI.openFile(saveDir);

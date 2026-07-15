@@ -49,7 +49,13 @@ ipcMain.handle('save-file', async (event, options) => {
 });
 
 ipcMain.handle('open-file', async (event, filePath) => {
-  return await shell.openPath(filePath);
+  if (!fs.existsSync(filePath)) {
+    return 'Path does not exist';
+  }
+  shell.openPath(filePath).catch(err => {
+    console.error('Failed to open path:', err);
+  });
+  return '';
 });
 
 ipcMain.handle('show-item-in-folder', async (event, filePath) => {

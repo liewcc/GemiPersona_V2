@@ -160,7 +160,7 @@
         async function triggerOpenDownloadFolder(event) {
             if (event) event.preventDefault();
             try {
-                const config = await api.getConfig();
+                const config = await window.electronAPI.readConfig();
                 const saveDir = config.save_dir;
                 if (saveDir) {
                     const result = await window.electronAPI.openFile(saveDir);
