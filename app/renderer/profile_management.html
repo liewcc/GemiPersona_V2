@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GemiPersona V2 - Profile Management</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        /* Table layout matching account_health */
+        .table-container {
+            width: 100%;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: rgba(0, 0, 0, 0.2);
+            height: 400px;
+            margin-bottom: 15px;
+        }
+        
+        .health-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+        
+        .health-table th, .health-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            vertical-align: middle;
+        }
+        
+        .health-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        
+        .health-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.05);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Modal Overlay for Confirmations */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 480px;
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            background-color: var(--bg-secondary);
+            box-shadow: var(--shadow);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .btn-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .btn-close:hover {
+            color: var(--text-main);
+        }
+        
+        /* Reorder Styles */
+        .reorder-row {
+            cursor: move;
+            transition: background-color 0.2s ease, border 0.2s ease;
+        }
+        .reorder-row.dragging {
+            opacity: 0.4;
+            background: rgba(160, 160, 255, 0.1) !important;
+            border: 2px dashed var(--accent);
+        }
+        .reorder-row.drag-over {
+            border-top: 2px solid var(--accent);
+        }
+        .btn-arrow {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            padding: 0;
+        }
+        .btn-arrow:hover:not(:disabled) {
+            background: rgba(160, 160, 255, 0.15);
+            border-color: rgba(160, 160, 255, 0.3);
+            color: #a0a0ff;
+        }
+        .btn-arrow:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <a href="setup.html" class="nav-item">
+                ⚙️ Setup
+            </a>
+            <a href="profile_management.html" class="nav-item active">
+                👤 Profile Management
+            </a>
+            <a href="utilities.html" class="nav-item">
+                🛠️ Utilities
+            </a>
+            <a href="account_health.html" class="nav-item">
+                ❤️ Account Health
+            </a>
+            <a href="system_config.html" class="nav-item">
+                ⚙️ System Config
+            </a>
+            <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
+                📂 Open Download Folder
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
+            
+            <!-- Top Controls (pinned at top, does not scroll) -->
+            <div class="d-flex flex-column mb-24 gap-15" style="width: 100%; flex-shrink: 0;">
+                <!-- Row 1: Engine & Browser Connection status -->
+                <div class="grid-2" style="flex-shrink: 0;">
+                    <div class="d-flex align-center justify-between glass" id="browserStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
+                        <div class="d-flex align-center gap-8">
+                            <span id="engineStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">ENGINE OFF</span>
+                            <span id="browserStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">BROWSER OFFLINE</span>
+                        </div>
+                        <div><span class="font-weight-600">Log in:</span> <span id="browserAccountText" class="text-muted">Not Ready</span></div>
+                    </div>
+                    <!-- Automation Stats -->
+                    <div class="d-flex align-center justify-between glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; white-space: nowrap; overflow: hidden;">
+                        <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Card: Profiles List (Glassmorphism layout matching Pro account credentials tab) -->
+            <div class="card glass" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 0; margin-bottom: 20px; padding: 20px;">
+                <div class="d-flex align-center justify-between mb-15">
+                    <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase;">Profiles List</div>
+                    <div id="profilesTableStatus" class="text-small text-success font-weight-600"></div>
+                </div>
+
+                <!-- Scrollable Table -->
+                <div class="table-container" style="flex-grow: 1; min-height: 0; height: auto; max-height: none; overflow-y: auto; margin-bottom: 15px; background: rgba(0, 0, 0, 0.15);">
+                    <table class="health-table" id="profilesTable" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="width: 200px;">Folder Name</th>
+                                <th style="width: 250px;">Registered Email</th>
+                                <th style="width: 200px;">Display Name</th>
+                                <th style="text-align: center; width: 180px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profilesTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center;" class="text-muted">Loading profiles...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="d-flex justify-between align-center">
+                    <div class="d-flex align-center gap-10" id="normalFooterButtons">
+                        <button class="btn btn-primary" id="btnAddProfile" onclick="startRegistration()" style="display: flex; align-items: center; gap: 8px;">📋 Add New Profile</button>
+                        <button class="btn" id="btnReorder" onclick="toggleReorderMode(true)" style="display: flex; align-items: center; gap: 8px;">↕️ Reorder Profiles</button>
+                        <button class="btn" id="btnRepack" onclick="showRepackConfirm()" style="display: flex; align-items: center; gap: 8px;">🔄 Repack Profile IDs</button>
+                    </div>
+                    <div class="d-flex align-center gap-10" id="reorderFooterButtons" style="display: none !important;">
+                        <button class="btn btn-success" id="btnSaveOrder" onclick="saveOrder()" style="display: flex; align-items: center; gap: 8px;">💾 Save New Profile Order</button>
+                        <button class="btn btn-secondary" id="btnCancelReorder" onclick="toggleReorderMode(false)" style="display: flex; align-items: center; gap: 8px;">❌ Cancel Re-order</button>
+                    </div>
+                    <span class="text-muted text-small" id="footerHelpText">Profiles are dynamically discovered from Chrome's Local State.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modals -->
+    <!-- Repack Modal -->
+    <div id="repackModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔄 Repack Profile IDs</h3>
+                <button class="btn-close" onclick="hideRepackConfirm()">&times;</button>
+            </div>
+            <p style="font-size: 14px; line-height: 1.5; margin-bottom: 20px; color: var(--text-main);">
+                Are you sure you want to repack all profile IDs? This will renumber the profile folders sequentially (e.g. <code>Profile 1</code>, <code>Profile 2</code>...) to fill any gaps.
+                <br><br>
+                <strong style="color: var(--danger);">WARNING:</strong> The browser must be closed, and this action cannot be undone.
+            </p>
+            <div class="d-flex justify-end gap-10">
+                <button class="btn" onclick="hideRepackConfirm()">Cancel</button>
+                <button class="btn btn-primary" id="btnConfirmRepack" onclick="confirmRepack()">Confirm Repack</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div id="deleteModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🗑️ Delete Profile</h3>
+                <button class="btn-close" onclick="hideDeleteConfirm()">&times;</button>
+            </div>
+            <p style="font-size: 14px; line-height: 1.5; margin-bottom: 20px; color: var(--text-main);">
+                Are you sure you want to delete profile <strong id="deleteProfileDirName" style="color: var(--danger);"></strong>?
+                This will delete its Chrome user data folder and all login sessions permanently.
+                <br><br>
+                <strong style="color: var(--danger);">WARNING:</strong> This action cannot be undone.
+            </p>
+            <div class="d-flex justify-end gap-10">
+                <button class="btn" onclick="hideDeleteConfirm()">Cancel</button>
+                <button class="btn btn-danger" id="btnConfirmDelete" onclick="confirmDelete()">Permanently Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let _profiles = [];
+        let _activeProfile = null;
+        let _activeUser = null;
+        let _deleteTargetName = null;
+        let _prevRegActive = false;
+        let _isBrowserRunning = false;
+        let _reorderMode = false;
+        let _tempProfiles = [];
+        let _draggedIdx = null;
+
+        // On load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initializePage();
+            // Start checking status periodically
+            setInterval(async () => {
+                await updateAccountStatus();
+                await updateAutomationStats();
+            }, 3000);
+        });
+
+        async function initializePage() {
+            setLoading(true);
+            try {
+                await Promise.all([
+                    updateAccountStatus(),
+                    updateAutomationStats(),
+                    loadProfiles()
+                ]);
+            } catch (err) {
+                console.error(err);
+                setStatus('Failed to initialize page.', true);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function setLoading(isLoading) {
+            const tableBody = document.getElementById('profilesTableBody');
+            if (isLoading) {
+                tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;" class="text-muted"><div class="d-flex align-center justify-center gap-10" style="padding: 20px 0;"><span class="spinner"></span> Loading profiles...</div></td></tr>`;
+            }
+        }
+
+        function setStatus(msg, isError = false) {
+            const el = document.getElementById('profilesTableStatus');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'text-small font-weight-600 ' + (isError ? 'text-danger' : 'text-success');
+            setTimeout(() => { el.textContent = ''; }, 5000);
+        }
+
+        async function updateAccountStatus() {
+            const engineStatusText = document.getElementById('engineStatusText');
+            const browserStatusText = document.getElementById('browserStatusText');
+            const browserAccountText = document.getElementById('browserAccountText');
+
+            let isServiceRunning = false;
+            let isBrowserRunning = false;
+            let browserStatus = null;
+            let regActive = false;
+
+            try {
+                const config = await api.getConfig();
+                _activeProfile = config.active_profile;
+                _activeUser = config.active_user;
+            } catch (err) {
+                console.error("Failed to load config:", err);
+            }
+
+            try {
+                const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                isServiceRunning = svcStatus.running;
+            } catch (err) {
+                console.error("Failed to get engine service status:", err);
+            }
+
+            if (isServiceRunning) {
+                try {
+                    browserStatus = await api.getBrowserStatus();
+                    isBrowserRunning = !!(browserStatus && browserStatus.engine_running);
+                    regActive = !!(browserStatus && browserStatus.registration_active);
+                } catch (err) {
+                    isServiceRunning = false;
+                }
+            }
+
+            if (isServiceRunning) {
+                engineStatusText.className = 'job-status-badge conn-badge-connected';
+                engineStatusText.textContent = 'ENGINE ON';
+                engineStatusText.style.background = 'rgba(46, 204, 113, 0.15)';
+                engineStatusText.style.color = '#2ecc71';
+                engineStatusText.style.border = '1px solid rgba(46, 204, 113, 0.3)';
+            } else {
+                engineStatusText.className = 'job-status-badge conn-badge-disconnected';
+                engineStatusText.textContent = 'ENGINE OFF';
+                engineStatusText.style.background = 'rgba(255, 255, 255, 0.05)';
+                engineStatusText.style.color = 'var(--text-muted)';
+                engineStatusText.style.border = '1px solid var(--border)';
+            }
+
+            if (isBrowserRunning) {
+                browserStatusText.className = 'job-status-badge conn-badge-connected';
+                browserStatusText.textContent = 'BROWSER ONLINE';
+                browserStatusText.style.background = 'rgba(46, 204, 113, 0.15)';
+                browserStatusText.style.color = '#2ecc71';
+                browserStatusText.style.border = '1px solid rgba(46, 204, 113, 0.3)';
+            } else {
+                browserStatusText.className = 'job-status-badge conn-badge-disconnected';
+                browserStatusText.textContent = 'BROWSER OFFLINE';
+                browserStatusText.style.background = 'rgba(255, 255, 255, 0.05)';
+                browserStatusText.style.color = 'var(--text-muted)';
+                browserStatusText.style.border = '1px solid var(--border)';
+            }
+
+            if (isServiceRunning && isBrowserRunning) {
+                try {
+                    const acc = await api.getAccountInfo();
+                    const rawAccId = acc.account_id || acc.status || 'Active';
+                    const cleanedAccId = rawAccId.replace(/@gmail\.com$/i, '');
+                    browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedAccId}</span>`;
+                } catch(e) {
+                    browserAccountText.innerHTML = `<span class="text-muted">Scanning...</span>`;
+                }
+            } else {
+                browserAccountText.innerHTML = `<span class="text-muted">Not Ready</span>`;
+            }
+
+            // Check transition of registration_active from true to false (registration finished)
+            if (_prevRegActive && !regActive) {
+                console.log("Registration browser closed. Refreshing profiles list...");
+                setStatus('Registration closed. Refreshing profile list...');
+                setTimeout(async () => {
+                    await loadProfiles();
+                    setStatus('Profile list updated.');
+                }, 1200);
+            }
+            _prevRegActive = regActive;
+            _isBrowserRunning = isBrowserRunning;
+        }
+
+        async function updateAutomationStats() {
+            try {
+                const stats = await api.getAutomationStats();
+                if (stats) {
+                    document.getElementById('statCycles').textContent = stats.cycles || 0;
+                    document.getElementById('statImages').textContent = stats.successes || 0;
+                    document.getElementById('statRefused').textContent = stats.refusals || 0;
+                    document.getElementById('statResets').textContent = stats.resets || 0;
+
+                    const badge = document.getElementById('autoStatusBadge');
+                    if (stats.is_running) {
+                        badge.className = 'job-status-badge conn-badge-connected';
+                        badge.innerHTML = 'RUNNING';
+                    } else if (stats.cycles > 0) {
+                        badge.className = 'job-status-badge conn-badge-disconnected';
+                        badge.innerHTML = 'IDLE / FINISHED';
+                    } else {
+                        badge.className = 'job-status-badge conn-badge-disconnected';
+                        badge.innerHTML = 'STANDBY';
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to get automation stats:", err);
+            }
+        }
+
+        async function loadProfiles() {
+            try {
+                try {
+                    const config = await api.getConfig();
+                    _activeProfile = config.active_profile;
+                    _activeUser = config.active_user;
+                } catch (err) {
+                    console.error("Failed to load config for active profile check:", err);
+                }
+
+                const res = await api.getProfilesStatus();
+                _profiles = res.profiles || [];
+                renderProfilesTable();
+            } catch (err) {
+                console.error(err);
+                setStatus('Failed to load profiles list.', true);
+            }
+        }
+
+        function renderProfilesTable() {
+            const tableBody = document.getElementById('profilesTableBody');
+            tableBody.innerHTML = '';
+
+            const list = _reorderMode ? _tempProfiles : _profiles;
+
+            if (list.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center;" class="text-muted">No successfully registered profiles found. Open Registration mode on Setup tab to log in.</td></tr>`;
+                return;
+            }
+
+            list.forEach((p, idx) => {
+                const dir = p.dir || '';
+                const email = p.email || '';
+                const name = p.name || '';
+
+                const isActive = (dir === _activeProfile || email === _activeUser);
+
+                const tr = document.createElement('tr');
+                if (_reorderMode) {
+                    tr.setAttribute('draggable', 'true');
+                    tr.className = 'reorder-row';
+                    setupDragAndDrop(tr, idx);
+                }
+
+                if (_reorderMode) {
+                    tr.innerHTML = `
+                        <td style="font-size: 13px; vertical-align: middle;">
+                            <div class="d-flex align-center gap-8">
+                                <span>${dir}</span>
+                                ${isActive ? '<span class="status-badge" style="background: rgba(46,204,113,0.18); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); padding: 2px 6px; font-size: 10px; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">ACTIVE</span>' : ''}
+                            </div>
+                        </td>
+                        <td style="font-weight: 600; font-size: 13px; vertical-align: middle; color: var(--text-main);">${email}</td>
+                        <td style="font-size: 13px; color: var(--text-muted); vertical-align: middle;">${name}</td>
+                        <td style="text-align: center; vertical-align: middle;">
+                            <div class="d-flex align-center justify-center gap-8">
+                                <button class="btn-arrow" onclick="moveRow(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Move Up">▲</button>
+                                <button class="btn-arrow" onclick="moveRow(${idx}, 1)" ${idx === list.length - 1 ? 'disabled' : ''} title="Move Down">▼</button>
+                                <span style="color: var(--text-muted); cursor: grab; font-size: 16px; margin-left: 8px; user-select: none;" title="Drag to reorder">☰</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td style="font-size: 13px; vertical-align: middle;">
+                            <div class="d-flex align-center gap-8">
+                                <span>${dir}</span>
+                                ${isActive ? '<span class="status-badge" style="background: rgba(46,204,113,0.18); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); padding: 2px 6px; font-size: 10px; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center;">ACTIVE</span>' : ''}
+                            </div>
+                        </td>
+                        <td style="font-weight: 600; font-size: 13px; vertical-align: middle; color: var(--text-main);">${email}</td>
+                        <td style="font-size: 13px; color: var(--text-muted); vertical-align: middle;">${name}</td>
+                        <td style="text-align: center; vertical-align: middle;">
+                            <div class="d-flex align-center justify-center gap-8">
+                                <button class="btn btn-sm btn-primary" onclick="switchToProfile('${email}', '${dir}')" ${isActive ? 'disabled' : ''} style="height:26px; padding:0 12px; font-size:11px; line-height:1; display:flex; align-items:center; gap:4px;">🚀 Switch</button>
+                                <button class="btn btn-sm btn-danger" onclick="showDeleteConfirm('${dir}')" ${isActive ? 'disabled' : ''} style="height:26px; padding:0 8px; font-size:11px; line-height:1; display:flex; align-items:center; background: rgba(231,76,60,0.15); border-color: rgba(231,76,60,0.3); color: #ff7b72;">🗑️ Delete</button>
+                            </div>
+                        </td>
+                    `;
+                }
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Reordering Helpers
+        function toggleReorderMode(enable) {
+            _reorderMode = enable;
+            if (enable) {
+                if (_isBrowserRunning) {
+                    alert("The browser is currently running. Please stop the browser/engine from the Setup tab before reordering profiles.");
+                    _reorderMode = false;
+                    return;
+                }
+                _tempProfiles = JSON.parse(JSON.stringify(_profiles));
+                document.getElementById('normalFooterButtons').style.display = 'none';
+                document.getElementById('reorderFooterButtons').style.setProperty('display', 'flex', 'important');
+                document.getElementById('footerHelpText').textContent = "Drag & drop rows or use arrows to rearrange profiles. Click Save when finished.";
+                document.getElementById('footerHelpText').classList.add('text-accent');
+            } else {
+                document.getElementById('normalFooterButtons').style.setProperty('display', 'flex', 'important');
+                document.getElementById('reorderFooterButtons').style.setProperty('display', 'none', 'important');
+                document.getElementById('footerHelpText').textContent = "Profiles are dynamically discovered from Chrome's Local State.";
+                document.getElementById('footerHelpText').classList.remove('text-accent');
+            }
+            renderProfilesTable();
+        }
+
+        function moveRow(index, direction) {
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= _tempProfiles.length) return;
+            
+            const temp = _tempProfiles[index];
+            _tempProfiles[index] = _tempProfiles[targetIndex];
+            _tempProfiles[targetIndex] = temp;
+            
+            renderProfilesTable();
+        }
+
+        function setupDragAndDrop(tr, index) {
+            tr.addEventListener('dragstart', (e) => {
+                tr.classList.add('dragging');
+                _draggedIdx = index;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index);
+            });
+
+            tr.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            });
+
+            tr.addEventListener('dragenter', (e) => {
+                if (_draggedIdx !== index) {
+                    tr.classList.add('drag-over');
+                }
+            });
+
+            tr.addEventListener('dragleave', (e) => {
+                tr.classList.remove('drag-over');
+            });
+
+            tr.addEventListener('drop', (e) => {
+                e.stopPropagation();
+                tr.classList.remove('drag-over');
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                if (fromIndex !== index) {
+                    const item = _tempProfiles.splice(fromIndex, 1)[0];
+                    _tempProfiles.splice(index, 0, item);
+                    renderProfilesTable();
+                }
+                return false;
+            });
+
+            tr.addEventListener('dragend', () => {
+                tr.classList.remove('dragging');
+                _draggedIdx = null;
+            });
+        }
+
+        function buildReorderRenameMap(originalDirs, newDirs) {
+            const map = {};
+            newDirs.forEach((dir, i) => {
+                if (dir !== originalDirs[i]) map[dir] = originalDirs[i];
+            });
+            return map;
+        }
+
+        async function saveOrder() {
+            if (_isBrowserRunning) {
+                alert("The browser is currently running. Please stop the browser/engine before reordering profiles.");
+                return;
+            }
+
+            const origDirs = _profiles.map(p => p.dir);
+            const newDirs = _tempProfiles.map(p => p.dir);
+
+            const renameMap = buildReorderRenameMap(origDirs, newDirs);
+            if (Object.keys(renameMap).length === 0) {
+                setStatus('Order unchanged.');
+                toggleReorderMode(false);
+                return;
+            }
+
+            setStatus('Saving new profile order on disk...');
+            try {
+                await api.reorderProfiles(renameMap);
+                setStatus('Successfully reordered profiles.');
+                toggleReorderMode(false);
+                await initializePage();
+            } catch (err) {
+                console.error(err);
+                setStatus(`Failed to reorder profiles: ${err.message}`, true);
+            }
+        }
+
+        // Switch profile
+        async function switchToProfile(email, dir) {
+            setStatus(`Switching to profile: ${email}...`);
+            try {
+                await api.accountSwitch(email, dir);
+                setStatus(`Successfully switched to profile ${email}.`);
+                await initializePage();
+            } catch (err) {
+                console.error(err);
+                setStatus(`Failed to switch profile: ${err.message}`, true);
+            }
+        }
+
+        // Repack Profile IDs
+        function showRepackConfirm() {
+            document.getElementById('repackModal').style.display = 'flex';
+        }
+
+        function hideRepackConfirm() {
+            document.getElementById('repackModal').style.display = 'none';
+        }
+
+        async function confirmRepack() {
+            hideRepackConfirm();
+            setStatus('Repacking profile IDs...');
+            try {
+                const res = await api.repackProfiles();
+                setStatus('Successfully repacked profile IDs.');
+                await initializePage();
+            } catch (err) {
+                console.error(err);
+                setStatus(`Failed to repack profiles: ${err.message || err.detail || 'Browser might be running.'}`, true);
+            }
+        }
+
+        // Delete Profile
+        function showDeleteConfirm(dir) {
+            _deleteTargetName = dir;
+            document.getElementById('deleteProfileDirName').textContent = dir;
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function hideDeleteConfirm() {
+            document.getElementById('deleteModal').style.display = 'none';
+            _deleteTargetName = null;
+        }
+
+        async function confirmDelete() {
+            const dir = _deleteTargetName;
+            hideDeleteConfirm();
+            if (!dir) return;
+
+            setStatus(`Deleting profile: ${dir}...`);
+            try {
+                await api.deleteProfile(dir);
+                setStatus(`Successfully deleted profile ${dir}.`);
+                await initializePage();
+            } catch (err) {
+                console.error(err);
+                setStatus(`Failed to delete profile: ${err.message || err.detail || 'Browser might be running.'}`, true);
+            }
+        }
+
+        // Helper to open download folder
+        async function triggerOpenDownloadFolder(e) {
+            if (e) e.preventDefault();
+            try {
+                const cfg = await api.getConfig();
+                const saveDir = cfg.save_dir;
+                if (saveDir && window.electronAPI && window.electronAPI.openDirectory) {
+                    await window.electronAPI.openDirectory(saveDir);
+                } else {
+                    console.error('Download folder not set or Electron API not available');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Add New Profile registration mode handler
+        async function startRegistration() {
+            setStatus('Checking engine and browser status...');
+            try {
+                // Check engine service status first
+                let isServiceRunning = false;
+                try {
+                    const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                    isServiceRunning = svcStatus.running;
+                } catch (e) {
+                    console.error(e);
+                }
+
+                if (!isServiceRunning) {
+                    setStatus('Engine service is offline. Please start it on Setup tab first.', true);
+                    alert('Engine service is offline. Please go to Setup tab and click "Start Engine" first.');
+                    return;
+                }
+
+                // Check if browser is running
+                let browserStatus = null;
+                try {
+                    browserStatus = await api.getBrowserStatus();
+                } catch (e) {
+                    console.error(e);
+                }
+
+                const isBrowserRunning = !!(browserStatus && browserStatus.engine_running);
+                if (isBrowserRunning) {
+                    const confirmStop = confirm(
+                        "The main browser is currently running.\n\n" +
+                        "We must stop the active browser loop/session first to launch the registration staging browser.\n\n" +
+                        "Would you like to stop it now and proceed?"
+                    );
+                    if (!confirmStop) {
+                        setStatus('Cancelled.');
+                        return;
+                    }
+
+                    setStatus('Stopping main browser and automation loop...');
+                    try {
+                        await api.stopAutomation();
+                    } catch (e) {}
+                    try {
+                        await api.stopEngine();
+                    } catch (e) {}
+
+                    // Poll status until browser is fully stopped
+                    let stopped = false;
+                    for (let i = 0; i < 20; i++) {
+                        await new Promise(r => setTimeout(r, 500));
+                        try {
+                            const status = await api.getBrowserStatus();
+                            if (!status || !status.engine_running) {
+                                stopped = true;
+                                break;
+                            }
+                        } catch (e) {
+                            stopped = true; // If request fails, browser probably went down
+                            break;
+                        }
+                    }
+
+                    if (!stopped) {
+                        setStatus('Failed to stop the main browser. Please stop it manually from Setup tab.', true);
+                        return;
+                    }
+                }
+
+                setStatus('Requesting registration mode...');
+                await api.startRegistrationMode();
+                setStatus('Registration mode active. Browser should open.');
+                await updateAccountStatus();
+            } catch (err) {
+                console.error(err);
+                setStatus('Failed to start registration: ' + err.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Direct profile list read — works even when the Python engine is offline
   readLoginLookup: () => ipcRenderer.invoke('read-login-lookup'),
   writeLoginLookup: (data) => ipcRenderer.invoke('write-login-lookup', data),
+  reorderProfiles: (renameMap) => ipcRenderer.invoke('reorder-profiles', renameMap),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   runUpdate: () => ipcRenderer.invoke('run-update'),
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),

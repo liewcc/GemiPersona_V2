@@ -247,6 +247,12 @@ class AutomationManager:
         async with httpx.AsyncClient(timeout=300.0) as client:
             return await client.get(url)
 
+    async def log_to_engine(self, message: str, level: str = "info"):
+        try:
+            await self._post("/engine/log", {"message": message, "level": level})
+        except Exception as e:
+            logger.error(f"Failed to log to engine: {e}")
+
     def start(self, mode: str, goal: int, config: dict, clear_pending: bool) -> bool:
         if self.automation_status["is_running"]:
             return False
@@ -302,6 +308,7 @@ class AutomationManager:
             def _step(name):
                 self.automation_status["current_step"] = name
                 logger.info(f"[automation] step: {name}")
+                asyncio.create_task(self.log_to_engine(f"[automation] step: {name}"))
 
             if self.ensure_service:
                 ok = await self.ensure_service()

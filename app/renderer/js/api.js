@@ -199,7 +199,7 @@ const api = {
         return this.request('/engine/profiles').catch(() => {
             if (window.electronAPI && window.electronAPI.readLoginLookup) {
                 return window.electronAPI.readLoginLookup().then(data => {
-                    return { profiles: data.map(u => u.username).filter(Boolean) };
+                    return { profiles: data.map(u => ({ dir: u.dir, email: u.email, name: u.name })) };
                 });
             }
             return { profiles: [] };
@@ -217,13 +217,19 @@ const api = {
     },
 
     getProfilesStatus() {
-        // Try live engine first; fall back to direct file read when offline
-        return this.request('/engine/profiles/status').catch(() => {
-            if (window.electronAPI && window.electronAPI.readLoginLookup) {
-                return window.electronAPI.readLoginLookup().then(data => ({ profiles: data }));
-            }
-            return { profiles: [] };
-        });
+        // Direct local file read of Chrome's Local State via IPC is instant and doesn't wake the engine
+        if (window.electronAPI && window.electronAPI.readLoginLookup) {
+            return window.electronAPI.readLoginLookup().then(data => ({ profiles: data }));
+        }
+        // Fallback to HTTP request if running in standard browser/development context
+        return this.request('/engine/profiles/status');
+    },
+
+    reorderProfiles(renameMap) {
+        if (window.electronAPI && window.electronAPI.reorderProfiles) {
+            return window.electronAPI.reorderProfiles(renameMap);
+        }
+        return Promise.reject(new Error('Electron IPC not available for reordering'));
     },
 
     saveProfiles(profiles) {
@@ -238,6 +244,15 @@ const api = {
             throw new Error('Engine offline and no Electron IPC available');
         });
     },
+
+    repackProfiles() {
+        return this.request('/engine/profiles/repack', 'POST');
+    },
+
+    deleteProfile(profileName) {
+        return this.request('/engine/profiles/delete', 'POST', { profile: profileName });
+    },
+
 
     getHealthRuns(limit = 50) {
         return this.request(`/health/runs?limit=${limit}`);

@@ -15,6 +15,7 @@ const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
 // V2 engine derives profiles from Local State; no login_lookup file. This path
 // backs only the offline IPC fallback (rarely fires — conductor auto-spawns engine).
 const LOGIN_LOOKUP_PATH = path.join(__dirname, '..', 'conductor', 'data', 'user_login_lookup.json');
+const ENGINE_LOCAL_STATE_PATH = path.join(__dirname, '..', 'Gemi_Engine_V2', 'browser_user_data', 'Local State');
 
 function loadConfig() {
   try {
@@ -466,11 +467,32 @@ ipcMain.handle('get-hide-cli', () => {
 // ── IPC: Direct login lookup read (works even when engine is offline) ──────────
 ipcMain.handle('read-login-lookup', async () => {
   try {
-    if (fs.existsSync(LOGIN_LOOKUP_PATH)) {
-      const content = fs.readFileSync(LOGIN_LOOKUP_PATH, 'utf-8');
+    if (fs.existsSync(ENGINE_LOCAL_STATE_PATH)) {
+      const content = fs.readFileSync(ENGINE_LOCAL_STATE_PATH, 'utf-8');
       if (content.trim().length > 0) {
-        const data = JSON.parse(content);
-        return Array.isArray(data) ? data : [];
+        const localState = JSON.parse(content);
+        const infoCache = localState.profile?.info_cache || {};
+        const items = [];
+        for (const [dir, info] of Object.entries(infoCache)) {
+          const email = (info.user_name || '').trim();
+          const name = (info.gaia_name || info.name || '').trim();
+          if (!email) continue;
+          items.push({ dir, email, name });
+        }
+        
+        // Sort items by directory name: Profile 1, Profile 2, etc.
+        items.sort((a, b) => {
+          const aMatch = a.dir.match(/^Profile (\d+)$/);
+          const bMatch = b.dir.match(/^Profile (\d+)$/);
+          if (aMatch && bMatch) {
+            return parseInt(aMatch[1], 10) - parseInt(bMatch[1], 10);
+          }
+          if (aMatch) return -1;
+          if (bMatch) return 1;
+          return a.dir.localeCompare(b.dir);
+        });
+        
+        return items;
       }
     }
   } catch (error) {
@@ -495,6 +517,92 @@ ipcMain.handle('write-login-lookup', async (event, data) => {
     return false;
   }
 });
+
+// Helper to check if a string matches "Profile \d+"
+function isNumberedProfile(dir) {
+  return /^Profile \d+$/.test(dir || '');
+}
+
+ipcMain.handle('reorder-profiles', async (event, renameMap) => {
+  try {
+    const dataDir = path.join(__dirname, '..', 'Gemi_Engine_V2', 'browser_user_data');
+    const folders = Object.keys(renameMap);
+
+    // 1. Two-phase rename to avoid collisions (since renameMap is a permutation)
+    folders.forEach(folder => {
+      const oldPath = path.join(dataDir, folder);
+      const tempPath = path.join(dataDir, folder + '_temp');
+      if (fs.existsSync(oldPath)) {
+        try { fs.renameSync(oldPath, tempPath); } catch (e) { console.error(`Temp rename failed for ${folder}:`, e); }
+      }
+    });
+    
+    folders.forEach(folder => {
+      const tempPath = path.join(dataDir, folder + '_temp');
+      const newPath = path.join(dataDir, renameMap[folder]);
+      if (fs.existsSync(tempPath)) {
+        try { fs.renameSync(tempPath, newPath); } catch (e) { console.error(`Final rename failed for ${folder}:`, e); }
+      }
+    });
+
+    // 2. Read and update Local State
+    if (fs.existsSync(ENGINE_LOCAL_STATE_PATH)) {
+      const content = fs.readFileSync(ENGINE_LOCAL_STATE_PATH, 'utf-8');
+      if (content.trim().length > 0) {
+        const localState = JSON.parse(content);
+        if (localState.profile) {
+          const profile = localState.profile;
+          if (profile.info_cache) {
+            const newCache = {};
+            Object.entries(profile.info_cache).forEach(([k, v]) => {
+              newCache[renameMap[k] || k] = v;
+            });
+            profile.info_cache = newCache;
+          }
+          if (profile.profiles_order) {
+            // keep order array in sync with new ID order
+            const nonNum = profile.profiles_order.filter(p => !isNumberedProfile(p));
+            const num = profile.profiles_order.filter(isNumberedProfile)
+              .sort((a, b) => parseInt(a.split(' ')[1], 10) - parseInt(b.split(' ')[1], 10));
+            profile.profiles_order = [...nonNum, ...num];
+          }
+          if (profile.last_used && renameMap[profile.last_used]) {
+            profile.last_used = renameMap[profile.last_used];
+          }
+          if (profile.last_active_profiles) {
+            profile.last_active_profiles = profile.last_active_profiles.map(p => renameMap[p] || p);
+          }
+        }
+        if (localState.variations_google_groups) {
+          const newVgg = {};
+          Object.entries(localState.variations_google_groups).forEach(([k, v]) => {
+            newVgg[renameMap[k] || k] = v;
+          });
+          localState.variations_google_groups = newVgg;
+        }
+        // Write atomic
+        const tmpStatePath = ENGINE_LOCAL_STATE_PATH + '.tmp';
+        fs.writeFileSync(tmpStatePath, JSON.stringify(localState, null, 4), 'utf-8');
+        fs.renameSync(tmpStatePath, ENGINE_LOCAL_STATE_PATH);
+      }
+    }
+
+    // 3. Update config.json active_profile if renamed
+    const cfg = loadConfig();
+    if (cfg.active_profile && renameMap[cfg.active_profile]) {
+      cfg.active_profile = renameMap[cfg.active_profile];
+      const dir = path.dirname(CONFIG_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 4), 'utf-8');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('reorder-profiles IPC error:', error);
+    throw error;
+  }
+});
+
 
 // ── Git update IPC ─────────────────────────────────────────────────────────────
 function gitExec(args, cwd) {

@@ -158,6 +158,9 @@
             <a href="setup.html" class="nav-item active">
                 ⚙️ Setup
             </a>
+            <a href="profile_management.html" class="nav-item">
+                👤 Profile Management
+            </a>
             <a href="utilities.html" class="nav-item">
                 🛠️ Utilities
             </a>
@@ -192,7 +195,7 @@
                     </div>
                     <!-- Automation Stats -->
                     <div class="d-flex align-center justify-between glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; white-space: nowrap; overflow: hidden;">
-                        <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span><span id="autoStepText" class="text-muted" style="margin-right: 8px;"></span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span><span id="newImagesBadge" class="new-images-badge" style="display: none;" title="Click to clear" onclick="resetNewImagesBadge()">+0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
+                        <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span><span id="newImagesBadge" class="new-images-badge" style="display: none;" title="Click to clear" onclick="resetNewImagesBadge()">+0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
                     </div>
                 </div>
                 <!-- Row 2: Action Controls -->
@@ -2506,8 +2509,6 @@
                 const stats = await api.getAutomationStats();
                 if (stats) {
                     const currentSuccesses = stats.successes || 0;
-                    const stepText = document.getElementById('autoStepText');
-                    if (stepText) stepText.textContent = stats.is_running && stats.current_step ? `[${stats.current_step}]` : '';
                     document.getElementById('statCycles').textContent = stats.cycles || 0;
                     document.getElementById('statImages').textContent = currentSuccesses;
                     document.getElementById('statRefused').textContent = stats.refusals || 0;
