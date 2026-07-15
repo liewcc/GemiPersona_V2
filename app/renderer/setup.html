@@ -724,6 +724,191 @@
             }
         }
 
+        // ── Status Cards Cache Helper Functions ──────────────────────────────────
+        function restoreStatusCardsCache() {
+            try {
+                const cacheStr = sessionStorage.getItem('status_cards_cache');
+                if (!cacheStr) return;
+                const cache = JSON.parse(cacheStr);
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText && cache.engineStatus) {
+                    engineStatusText.textContent = cache.engineStatus.text;
+                    engineStatusText.className = cache.engineStatus.class;
+                    if (cache.engineStatus.bg !== undefined) engineStatusText.style.background = cache.engineStatus.bg;
+                    if (cache.engineStatus.color !== undefined) engineStatusText.style.color = cache.engineStatus.color;
+                    if (cache.engineStatus.border !== undefined) engineStatusText.style.border = cache.engineStatus.border;
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText && cache.browserStatus) {
+                    browserStatusText.textContent = cache.browserStatus.text;
+                    browserStatusText.className = cache.browserStatus.class;
+                    if (cache.browserStatus.bg !== undefined) browserStatusText.style.background = cache.browserStatus.bg;
+                    if (cache.browserStatus.color !== undefined) browserStatusText.style.color = cache.browserStatus.color;
+                    if (cache.browserStatus.border !== undefined) browserStatusText.style.border = cache.browserStatus.border;
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText && cache.browserAccount) {
+                    browserAccountText.innerHTML = cache.browserAccount.html;
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge && cache.autoStatus) {
+                    autoStatusBadge.innerHTML = cache.autoStatus.text;
+                    autoStatusBadge.className = cache.autoStatus.class;
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el && cache.stats && cache.stats[key] !== undefined) {
+                        el.textContent = cache.stats[key];
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring status cards cache:', e);
+            }
+        }
+
+        function saveStatusCardsCache() {
+            try {
+                const cache = {
+                    engineStatus: {},
+                    browserStatus: {},
+                    browserAccount: {},
+                    autoStatus: {},
+                    stats: {}
+                };
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText) {
+                    cache.engineStatus = {
+                        text: engineStatusText.textContent,
+                        class: engineStatusText.className,
+                        bg: engineStatusText.style.background || '',
+                        color: engineStatusText.style.color || '',
+                        border: engineStatusText.style.border || ''
+                    };
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText) {
+                    cache.browserStatus = {
+                        text: browserStatusText.textContent,
+                        class: browserStatusText.className,
+                        bg: browserStatusText.style.background || '',
+                        color: browserStatusText.style.color || '',
+                        border: browserStatusText.style.border || ''
+                    };
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText) {
+                    cache.browserAccount = {
+                        html: browserAccountText.innerHTML
+                    };
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge) {
+                    cache.autoStatus = {
+                        text: autoStatusBadge.innerHTML,
+                        class: autoStatusBadge.className
+                    };
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        cache.stats[key] = el.textContent;
+                    }
+                }
+                
+                sessionStorage.setItem('status_cards_cache', JSON.stringify(cache));
+            } catch (e) {
+                console.error('Error saving status cards cache:', e);
+            }
+        }
+
+        function updateElementState(el, text, className, bg = null, color = null, border = null) {
+            if (!el) return false;
+            let changed = false;
+            if (el.textContent !== text) {
+                el.textContent = text;
+                changed = true;
+            }
+            if (el.className !== className) {
+                el.className = className;
+                changed = true;
+            }
+            if (bg !== null) {
+                if (el.style.background !== bg) {
+                    el.style.background = bg;
+                    changed = true;
+                }
+            } else {
+                if (el.style.background !== '') {
+                    el.style.background = '';
+                    changed = true;
+                }
+            }
+            if (color !== null) {
+                if (el.style.color !== color) {
+                    el.style.color = color;
+                    changed = true;
+                }
+            } else {
+                if (el.style.color !== '') {
+                    el.style.color = '';
+                    changed = true;
+                }
+            }
+            if (border !== null) {
+                if (el.style.border !== border) {
+                    el.style.border = border;
+                    changed = true;
+                }
+            } else {
+                if (el.style.border !== '') {
+                    el.style.border = '';
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        function updateElementHTML(el, html) {
+            if (!el) return false;
+            if (el.innerHTML !== html) {
+                el.innerHTML = html;
+                return true;
+            }
+            return false;
+        }
+
+        function updateElementText(el, text) {
+            if (!el) return false;
+            const strText = String(text);
+            if (el.textContent !== strText) {
+                el.textContent = strText;
+                return true;
+            }
+            return false;
+        }
+
         // ── Last-path helpers (persisted via localStorage) ─────────────────────
         function getLastPath(key) {
             return localStorage.getItem('browsePath_' + key) || undefined;
@@ -1090,42 +1275,42 @@
                 });
             }
 
+            let changed = false;
+
             // Update Engine Button and Label
             if (isServiceRunning) {
-                if (engineCardBtn) engineCardBtn.textContent = 'Stop Engine';
-                if (engineStatusText) {
-                    engineStatusText.className = 'job-status-badge conn-badge-connected';
-                    engineStatusText.textContent = 'ENGINE ON';
+                if (engineCardBtn && engineCardBtn.textContent !== 'Stop Engine') {
+                    engineCardBtn.textContent = 'Stop Engine';
                 }
+                changed |= updateElementState(engineStatusText, 'ENGINE ON', 'job-status-badge conn-badge-connected');
             } else {
-                if (engineCardBtn) engineCardBtn.textContent = 'Start Engine';
-                if (engineStatusText) {
-                    engineStatusText.className = 'job-status-badge conn-badge-disconnected';
-                    engineStatusText.textContent = 'ENGINE OFF';
+                if (engineCardBtn && engineCardBtn.textContent !== 'Start Engine') {
+                    engineCardBtn.textContent = 'Start Engine';
                 }
+                changed |= updateElementState(engineStatusText, 'ENGINE OFF', 'job-status-badge conn-badge-disconnected');
             }
 
             // Update Browser Button and Label
             if (isBrowserRunning) {
                 if (browserCardBtn) {
-                    browserCardBtn.textContent = 'Stop Browser';
-                    browserCardBtn.removeAttribute('disabled');
-                    browserCardBtn.title = '';
+                    if (browserCardBtn.textContent !== 'Stop Browser') browserCardBtn.textContent = 'Stop Browser';
+                    if (browserCardBtn.hasAttribute('disabled')) browserCardBtn.removeAttribute('disabled');
+                    if (browserCardBtn.title !== '') browserCardBtn.title = '';
                 }
             } else {
                 if (browserCardBtn) {
-                    browserCardBtn.textContent = 'Start Browser';
+                    if (browserCardBtn.textContent !== 'Start Browser') browserCardBtn.textContent = 'Start Browser';
                     if (isServiceRunning) {
                         if (isUpscalerRunning) {
-                            browserCardBtn.setAttribute('disabled', 'true');
-                            browserCardBtn.title = '4K Upscaler is running';
+                            if (!browserCardBtn.hasAttribute('disabled')) browserCardBtn.setAttribute('disabled', 'true');
+                            if (browserCardBtn.title !== '4K Upscaler is running') browserCardBtn.title = '4K Upscaler is running';
                         } else {
-                            browserCardBtn.removeAttribute('disabled');
-                            browserCardBtn.title = '';
+                            if (browserCardBtn.hasAttribute('disabled')) browserCardBtn.removeAttribute('disabled');
+                            if (browserCardBtn.title !== '') browserCardBtn.title = '';
                         }
                     } else {
-                        browserCardBtn.setAttribute('disabled', 'true');
-                        browserCardBtn.title = 'Start Engine first';
+                        if (!browserCardBtn.hasAttribute('disabled')) browserCardBtn.setAttribute('disabled', 'true');
+                        if (browserCardBtn.title !== 'Start Engine first') browserCardBtn.title = 'Start Engine first';
                     }
                 }
             }
@@ -1148,15 +1333,9 @@
             prevBrowserOnline = isBrowserOnline;
 
             if (isBrowserOnline) {
-                if (browserStatusText) {
-                    browserStatusText.className = 'job-status-badge conn-badge-connected';
-                    browserStatusText.textContent = 'BROWSER ONLINE';
-                }
+                changed |= updateElementState(browserStatusText, 'BROWSER ONLINE', 'job-status-badge conn-badge-connected');
             } else {
-                if (browserStatusText) {
-                    browserStatusText.className = 'job-status-badge conn-badge-disconnected';
-                    browserStatusText.textContent = 'BROWSER OFFLINE';
-                }
+                changed |= updateElementState(browserStatusText, 'BROWSER OFFLINE', 'job-status-badge conn-badge-disconnected');
             }
 
             // Update Active Profile and Logged In Text
@@ -1164,10 +1343,14 @@
                 const config = await api.getConfig();
                 const activeProfile = config.active_user || 'None';
                 const cleanedProfile = activeProfile.replace(/@gmail\.com$/i, '');
-                if (setupAccountLabel) setupAccountLabel.textContent = cleanedProfile;
+                if (setupAccountLabel && setupAccountLabel.textContent !== cleanedProfile) {
+                    setupAccountLabel.textContent = cleanedProfile;
+                }
             } catch (err) {
                 console.error("Failed to load active profile from config:", err);
-                if (setupAccountLabel) setupAccountLabel.textContent = 'Unknown';
+                if (setupAccountLabel && setupAccountLabel.textContent !== 'Unknown') {
+                    setupAccountLabel.textContent = 'Unknown';
+                }
             }
 
             if (isServiceRunning && isBrowserOnline) {
@@ -1176,18 +1359,24 @@
                         const config = await api.getConfig();
                         const upAcc = config?.upscaler?.profile || 'Unknown';
                         const cleanedUpAcc = upAcc.replace(/@gmail\.com$/i, '');
-                        if (browserAccountText) browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedUpAcc}</span>`;
+                        changed |= updateElementHTML(browserAccountText, `<span class="text-accent font-weight-600">${cleanedUpAcc}</span>`);
                     } else {
                         const acc = await api.getAccountInfo();
                         const rawAccId = acc.account_id || acc.status || 'Active';
                         const cleanedAccId = rawAccId.replace(/@gmail\.com$/i, '');
-                        if (browserAccountText) browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedAccId}</span>`;
+                        changed |= updateElementHTML(browserAccountText, `<span class="text-accent font-weight-600">${cleanedAccId}</span>`);
                     }
                 } catch(e) {
-                    if (browserAccountText) browserAccountText.innerHTML = `<span class="text-muted">Scanning...</span>`;
+                    if (!browserAccountText || !browserAccountText.textContent || browserAccountText.textContent.trim() === 'Not Ready' || browserAccountText.textContent.trim() === 'Scanning...') {
+                        changed |= updateElementHTML(browserAccountText, `<span class="text-muted">Scanning...</span>`);
+                    }
                 }
             } else {
-                if (browserAccountText) browserAccountText.innerHTML = `<span class="text-muted">Not Ready</span>`;
+                changed |= updateElementHTML(browserAccountText, `<span class="text-muted">Not Ready</span>`);
+            }
+
+            if (changed) {
+                saveStatusCardsCache();
             }
         }
 
@@ -2509,10 +2698,12 @@
                 const stats = await api.getAutomationStats();
                 if (stats) {
                     const currentSuccesses = stats.successes || 0;
-                    document.getElementById('statCycles').textContent = stats.cycles || 0;
-                    document.getElementById('statImages').textContent = currentSuccesses;
-                    document.getElementById('statRefused').textContent = stats.refusals || 0;
-                    document.getElementById('statResets').textContent = stats.resets || 0;
+                    let changed = false;
+
+                    changed |= updateElementText(document.getElementById('statCycles'), stats.cycles || 0);
+                    changed |= updateElementText(document.getElementById('statImages'), currentSuccesses);
+                    changed |= updateElementText(document.getElementById('statRefused'), stats.refusals || 0);
+                    changed |= updateElementText(document.getElementById('statResets'), stats.resets || 0);
 
                     // Update newly downloaded images badge
                     if (baseSuccesses === null) {
@@ -2529,10 +2720,16 @@
                     if (newImagesBadge) {
                         const delta = currentSuccesses - baseSuccesses;
                         if (delta > 0) {
-                            newImagesBadge.textContent = `+${delta}`;
-                            newImagesBadge.style.display = 'inline-flex';
+                            changed |= updateElementText(newImagesBadge, `+${delta}`);
+                            if (newImagesBadge.style.display !== 'inline-flex') {
+                                newImagesBadge.style.display = 'inline-flex';
+                                changed = true;
+                            }
                         } else {
-                            newImagesBadge.style.display = 'none';
+                            if (newImagesBadge.style.display !== 'none') {
+                                newImagesBadge.style.display = 'none';
+                                changed = true;
+                            }
                         }
                     }
 
@@ -2548,15 +2745,14 @@
                     _lastKnownSuccesses = currentSuccesses;
 
                     const badge = document.getElementById('autoStatusBadge');
-                    if (stats.is_running) {
-                        badge.className = 'job-status-badge conn-badge-connected';
-                        badge.innerHTML = 'RUNNING';
-                    } else if (stats.cycles > 0) {
-                        badge.className = 'job-status-badge conn-badge-disconnected';
-                        badge.innerHTML = 'IDLE / FINISHED';
-                    } else {
-                        badge.className = 'job-status-badge conn-badge-disconnected';
-                        badge.innerHTML = 'STANDBY';
+                    if (badge) {
+                        if (stats.is_running) {
+                            changed |= updateElementState(badge, 'RUNNING', 'job-status-badge conn-badge-connected');
+                        } else if (stats.cycles > 0) {
+                            changed |= updateElementState(badge, 'IDLE / FINISHED', 'job-status-badge conn-badge-disconnected');
+                        } else {
+                            changed |= updateElementState(badge, 'STANDBY', 'job-status-badge conn-badge-disconnected');
+                        }
                     }
 
                     // Update LC inputs disabled state
@@ -2580,20 +2776,20 @@
                     const btnContinue = document.getElementById('btnContinue');
                     if (stats.is_running) {
                         if (btnStartStop) {
-                            btnStartStop.innerText = '⏹ Stop Loop';
-                            btnStartStop.className = 'btn btn-danger flex-grow-1';
-                            btnStartStop.disabled = false;
+                            if (btnStartStop.innerText !== '⏹ Stop Loop') btnStartStop.innerText = '⏹ Stop Loop';
+                            if (btnStartStop.className !== 'btn btn-danger flex-grow-1') btnStartStop.className = 'btn btn-danger flex-grow-1';
+                            if (btnStartStop.disabled !== false) btnStartStop.disabled = false;
                         }
-                        if (btnContinue) {
+                        if (btnContinue && btnContinue.disabled !== true) {
                             btnContinue.disabled = true;
                         }
                     } else {
                         if (btnStartStop) {
-                            btnStartStop.innerText = '▶ Start Loop';
-                            btnStartStop.className = 'btn btn-primary flex-grow-1';
-                            btnStartStop.disabled = false;
+                            if (btnStartStop.innerText !== '▶ Start Loop') btnStartStop.innerText = '▶ Start Loop';
+                            if (btnStartStop.className !== 'btn btn-primary flex-grow-1') btnStartStop.className = 'btn btn-primary flex-grow-1';
+                            if (btnStartStop.disabled !== false) btnStartStop.disabled = false;
                         }
-                        if (btnContinue) {
+                        if (btnContinue && btnContinue.disabled !== false) {
                             btnContinue.disabled = false;
                         }
                     }
@@ -2602,20 +2798,24 @@
                     const timeEn = document.getElementById('lc_time_en').checked;
                     const timerDisplay = document.getElementById('lcTimerDisplay');
                     if (stats.is_running && timeEn && stats.lc_time_threshold_start_ts) {
-                        timerDisplay.style.display = 'flex';
+                        if (timerDisplay && timerDisplay.style.display !== 'flex') timerDisplay.style.display = 'flex';
                         const elapsedSec = Math.max(0, Math.floor(Date.now() / 1000 - stats.lc_time_threshold_start_ts));
                         const limitMin = parseInt(document.getElementById('lc_time_min').value) || 10;
-                        document.getElementById('lcTimerElapsed').textContent = formatDuration(elapsedSec);
-                        document.getElementById('lcTimerLimit').textContent = formatDuration(limitMin * 60);
+                        updateElementText(document.getElementById('lcTimerElapsed'), formatDuration(elapsedSec));
+                        updateElementText(document.getElementById('lcTimerLimit'), formatDuration(limitMin * 60));
                     } else {
-                        timerDisplay.style.display = 'none';
+                        if (timerDisplay && timerDisplay.style.display !== 'none') timerDisplay.style.display = 'none';
+                    }
+
+                    if (changed) {
+                        saveStatusCardsCache();
                     }
                 }
             } catch(e) {
                 const badge = document.getElementById('autoStatusBadge');
+                let changed = false;
                 if (badge) {
-                    badge.className = 'job-status-badge conn-badge-disconnected';
-                    badge.innerHTML = 'OFFLINE';
+                    changed |= updateElementState(badge, 'OFFLINE', 'job-status-badge conn-badge-disconnected');
                 }
                 updateLcInputsState(false);
                 updateSendButtonsState(false);
@@ -2629,17 +2829,21 @@
                 stopBtns.forEach(b => { if (b) b.disabled = false; });
 
                 const timerDisplay = document.getElementById('lcTimerDisplay');
-                if (timerDisplay) timerDisplay.style.display = 'none';
+                if (timerDisplay && timerDisplay.style.display !== 'none') timerDisplay.style.display = 'none';
 
                 const btnStartStop = document.getElementById('btnStartStop');
                 const btnContinue = document.getElementById('btnContinue');
                 if (btnStartStop) {
-                    btnStartStop.innerText = '▶ Start Loop';
-                    btnStartStop.className = 'btn btn-primary flex-grow-1';
-                    btnStartStop.disabled = true;
+                    if (btnStartStop.innerText !== '▶ Start Loop') btnStartStop.innerText = '▶ Start Loop';
+                    if (btnStartStop.className !== 'btn btn-primary flex-grow-1') btnStartStop.className = 'btn btn-primary flex-grow-1';
+                    if (btnStartStop.disabled !== true) btnStartStop.disabled = true;
                 }
-                if (btnContinue) {
+                if (btnContinue && btnContinue.disabled !== true) {
                     btnContinue.disabled = true;
+                }
+
+                if (changed) {
+                    saveStatusCardsCache();
                 }
             }
         }
@@ -2932,6 +3136,7 @@
 
         // DOM Initializer
         document.addEventListener('DOMContentLoaded', () => {
+            restoreStatusCardsCache();
             loadConfigFromServer();
             bindLcChangeEvents();
             refreshLogs(); // Fetch history immediately on load

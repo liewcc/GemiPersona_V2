@@ -240,7 +240,7 @@
                         <button class="btn btn-success" id="btnSaveOrder" onclick="saveOrder()" style="display: flex; align-items: center; gap: 8px;">💾 Save New Profile Order</button>
                         <button class="btn btn-secondary" id="btnCancelReorder" onclick="toggleReorderMode(false)" style="display: flex; align-items: center; gap: 8px;">❌ Cancel Re-order</button>
                     </div>
-                    <span class="text-muted text-small" id="footerHelpText">Profiles are dynamically discovered from Chrome's Local State.</span>
+                    <span class="text-muted text-small" id="footerHelpText"></span>
                 </div>
             </div>
         </div>
@@ -298,8 +298,194 @@
         let _tempProfiles = [];
         let _draggedIdx = null;
 
+        // ── Status Cards Cache Helper Functions ──────────────────────────────────
+        function restoreStatusCardsCache() {
+            try {
+                const cacheStr = sessionStorage.getItem('status_cards_cache');
+                if (!cacheStr) return;
+                const cache = JSON.parse(cacheStr);
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText && cache.engineStatus) {
+                    engineStatusText.textContent = cache.engineStatus.text;
+                    engineStatusText.className = cache.engineStatus.class;
+                    if (cache.engineStatus.bg !== undefined) engineStatusText.style.background = cache.engineStatus.bg;
+                    if (cache.engineStatus.color !== undefined) engineStatusText.style.color = cache.engineStatus.color;
+                    if (cache.engineStatus.border !== undefined) engineStatusText.style.border = cache.engineStatus.border;
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText && cache.browserStatus) {
+                    browserStatusText.textContent = cache.browserStatus.text;
+                    browserStatusText.className = cache.browserStatus.class;
+                    if (cache.browserStatus.bg !== undefined) browserStatusText.style.background = cache.browserStatus.bg;
+                    if (cache.browserStatus.color !== undefined) browserStatusText.style.color = cache.browserStatus.color;
+                    if (cache.browserStatus.border !== undefined) browserStatusText.style.border = cache.browserStatus.border;
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText && cache.browserAccount) {
+                    browserAccountText.innerHTML = cache.browserAccount.html;
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge && cache.autoStatus) {
+                    autoStatusBadge.innerHTML = cache.autoStatus.text;
+                    autoStatusBadge.className = cache.autoStatus.class;
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el && cache.stats && cache.stats[key] !== undefined) {
+                        el.textContent = cache.stats[key];
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring status cards cache:', e);
+            }
+        }
+
+        function saveStatusCardsCache() {
+            try {
+                const cache = {
+                    engineStatus: {},
+                    browserStatus: {},
+                    browserAccount: {},
+                    autoStatus: {},
+                    stats: {}
+                };
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText) {
+                    cache.engineStatus = {
+                        text: engineStatusText.textContent,
+                        class: engineStatusText.className,
+                        bg: engineStatusText.style.background || '',
+                        color: engineStatusText.style.color || '',
+                        border: engineStatusText.style.border || ''
+                    };
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText) {
+                    cache.browserStatus = {
+                        text: browserStatusText.textContent,
+                        class: browserStatusText.className,
+                        bg: browserStatusText.style.background || '',
+                        color: browserStatusText.style.color || '',
+                        border: browserStatusText.style.border || ''
+                    };
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText) {
+                    cache.browserAccount = {
+                        html: browserAccountText.innerHTML
+                    };
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge) {
+                    cache.autoStatus = {
+                        text: autoStatusBadge.innerHTML,
+                        class: autoStatusBadge.className
+                    };
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        cache.stats[key] = el.textContent;
+                    }
+                }
+                
+                sessionStorage.setItem('status_cards_cache', JSON.stringify(cache));
+            } catch (e) {
+                console.error('Error saving status cards cache:', e);
+            }
+        }
+
+        function updateElementState(el, text, className, bg = null, color = null, border = null) {
+            if (!el) return false;
+            let changed = false;
+            if (el.textContent !== text) {
+                el.textContent = text;
+                changed = true;
+            }
+            if (el.className !== className) {
+                el.className = className;
+                changed = true;
+            }
+            if (bg !== null) {
+                if (el.style.background !== bg) {
+                    el.style.background = bg;
+                    changed = true;
+                }
+            } else {
+                if (el.style.background !== '') {
+                    el.style.background = '';
+                    changed = true;
+                }
+            }
+            if (color !== null) {
+                if (el.style.color !== color) {
+                    el.style.color = color;
+                    changed = true;
+                }
+            } else {
+                if (el.style.color !== '') {
+                    el.style.color = '';
+                    changed = true;
+                }
+            }
+            if (border !== null) {
+                if (el.style.border !== border) {
+                    el.style.border = border;
+                    changed = true;
+                }
+            } else {
+                if (el.style.border !== '') {
+                    el.style.border = '';
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        function updateElementHTML(el, html) {
+            if (!el) return false;
+            if (el.innerHTML !== html) {
+                el.innerHTML = html;
+                return true;
+            }
+            return false;
+        }
+
+        function updateElementText(el, text) {
+            if (!el) return false;
+            const strText = String(text);
+            if (el.textContent !== strText) {
+                el.textContent = strText;
+                return true;
+            }
+            return false;
+        }
+
         // On load
         document.addEventListener('DOMContentLoaded', async () => {
+            restoreStatusCardsCache();
             await initializePage();
             // Start checking status periodically
             setInterval(async () => {
@@ -374,32 +560,18 @@
                 }
             }
 
+            let changed = false;
+
             if (isServiceRunning) {
-                engineStatusText.className = 'job-status-badge conn-badge-connected';
-                engineStatusText.textContent = 'ENGINE ON';
-                engineStatusText.style.background = 'rgba(46, 204, 113, 0.15)';
-                engineStatusText.style.color = '#2ecc71';
-                engineStatusText.style.border = '1px solid rgba(46, 204, 113, 0.3)';
+                changed |= updateElementState(engineStatusText, 'ENGINE ON', 'job-status-badge conn-badge-connected', 'rgba(46, 204, 113, 0.15)', '#2ecc71', '1px solid rgba(46, 204, 113, 0.3)');
             } else {
-                engineStatusText.className = 'job-status-badge conn-badge-disconnected';
-                engineStatusText.textContent = 'ENGINE OFF';
-                engineStatusText.style.background = 'rgba(255, 255, 255, 0.05)';
-                engineStatusText.style.color = 'var(--text-muted)';
-                engineStatusText.style.border = '1px solid var(--border)';
+                changed |= updateElementState(engineStatusText, 'ENGINE OFF', 'job-status-badge conn-badge-disconnected', 'rgba(255, 255, 255, 0.05)', 'var(--text-muted)', '1px solid var(--border)');
             }
 
             if (isBrowserRunning) {
-                browserStatusText.className = 'job-status-badge conn-badge-connected';
-                browserStatusText.textContent = 'BROWSER ONLINE';
-                browserStatusText.style.background = 'rgba(46, 204, 113, 0.15)';
-                browserStatusText.style.color = '#2ecc71';
-                browserStatusText.style.border = '1px solid rgba(46, 204, 113, 0.3)';
+                changed |= updateElementState(browserStatusText, 'BROWSER ONLINE', 'job-status-badge conn-badge-connected', 'rgba(46, 204, 113, 0.15)', '#2ecc71', '1px solid rgba(46, 204, 113, 0.3)');
             } else {
-                browserStatusText.className = 'job-status-badge conn-badge-disconnected';
-                browserStatusText.textContent = 'BROWSER OFFLINE';
-                browserStatusText.style.background = 'rgba(255, 255, 255, 0.05)';
-                browserStatusText.style.color = 'var(--text-muted)';
-                browserStatusText.style.border = '1px solid var(--border)';
+                changed |= updateElementState(browserStatusText, 'BROWSER OFFLINE', 'job-status-badge conn-badge-disconnected', 'rgba(255, 255, 255, 0.05)', 'var(--text-muted)', '1px solid var(--border)');
             }
 
             if (isServiceRunning && isBrowserRunning) {
@@ -407,12 +579,18 @@
                     const acc = await api.getAccountInfo();
                     const rawAccId = acc.account_id || acc.status || 'Active';
                     const cleanedAccId = rawAccId.replace(/@gmail\.com$/i, '');
-                    browserAccountText.innerHTML = `<span class="text-accent font-weight-600">${cleanedAccId}</span>`;
+                    changed |= updateElementHTML(browserAccountText, `<span class="text-accent font-weight-600">${cleanedAccId}</span>`);
                 } catch(e) {
-                    browserAccountText.innerHTML = `<span class="text-muted">Scanning...</span>`;
+                    if (!browserAccountText || !browserAccountText.textContent || browserAccountText.textContent.trim() === 'Not Ready' || browserAccountText.textContent.trim() === 'Scanning...') {
+                        changed |= updateElementHTML(browserAccountText, `<span class="text-muted">Scanning...</span>`);
+                    }
                 }
             } else {
-                browserAccountText.innerHTML = `<span class="text-muted">Not Ready</span>`;
+                changed |= updateElementHTML(browserAccountText, `<span class="text-muted">Not Ready</span>`);
+            }
+
+            if (changed) {
+                saveStatusCardsCache();
             }
 
             // Check transition of registration_active from true to false (registration finished)
@@ -432,21 +610,25 @@
             try {
                 const stats = await api.getAutomationStats();
                 if (stats) {
-                    document.getElementById('statCycles').textContent = stats.cycles || 0;
-                    document.getElementById('statImages').textContent = stats.successes || 0;
-                    document.getElementById('statRefused').textContent = stats.refusals || 0;
-                    document.getElementById('statResets').textContent = stats.resets || 0;
+                    let changed = false;
+                    changed |= updateElementText(document.getElementById('statCycles'), stats.cycles || 0);
+                    changed |= updateElementText(document.getElementById('statImages'), stats.successes || 0);
+                    changed |= updateElementText(document.getElementById('statRefused'), stats.refusals || 0);
+                    changed |= updateElementText(document.getElementById('statResets'), stats.resets || 0);
 
                     const badge = document.getElementById('autoStatusBadge');
-                    if (stats.is_running) {
-                        badge.className = 'job-status-badge conn-badge-connected';
-                        badge.innerHTML = 'RUNNING';
-                    } else if (stats.cycles > 0) {
-                        badge.className = 'job-status-badge conn-badge-disconnected';
-                        badge.innerHTML = 'IDLE / FINISHED';
-                    } else {
-                        badge.className = 'job-status-badge conn-badge-disconnected';
-                        badge.innerHTML = 'STANDBY';
+                    if (badge) {
+                        if (stats.is_running) {
+                            changed |= updateElementState(badge, 'RUNNING', 'job-status-badge conn-badge-connected');
+                        } else if (stats.cycles > 0) {
+                            changed |= updateElementState(badge, 'IDLE / FINISHED', 'job-status-badge conn-badge-disconnected');
+                        } else {
+                            changed |= updateElementState(badge, 'STANDBY', 'job-status-badge conn-badge-disconnected');
+                        }
+                    }
+
+                    if (changed) {
+                        saveStatusCardsCache();
                     }
                 }
             } catch (err) {
@@ -555,7 +737,7 @@
             } else {
                 document.getElementById('normalFooterButtons').style.setProperty('display', 'flex', 'important');
                 document.getElementById('reorderFooterButtons').style.setProperty('display', 'none', 'important');
-                document.getElementById('footerHelpText').textContent = "Profiles are dynamically discovered from Chrome's Local State.";
+                document.getElementById('footerHelpText').textContent = "";
                 document.getElementById('footerHelpText').classList.remove('text-accent');
             }
             renderProfilesTable();
