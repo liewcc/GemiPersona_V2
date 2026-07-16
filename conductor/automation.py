@@ -554,10 +554,7 @@ class AutomationManager:
                                         "time_threshold_duration_sec": time.time() - (self._lc_time_threshold_start_time or time.time())
                                     }
                                     
-                                    loop_ctrl = self.config.get("automation", {}).get("loop_control", {})
-                                    switch, action = self._check_loop_control_thresholds(loop_ctrl, result)
-                                    if switch:
-                                        await self._handle_switch_action(action)
+                                    await self._on_cycle_success(result)
                                 else:
                                     self._record_reset()
                             else:
@@ -625,6 +622,20 @@ class AutomationManager:
             account=self.automation_status["current_account_id"],
             cycle_index=self.automation_status["cycles"])
         
+    async def _on_cycle_success(self, result: dict):
+        """Apply loop-control thresholds after a successful cycle, then restart
+        the time-threshold timer.
+
+        The reset MUST happen after the threshold check: a cycle that succeeded
+        but already overran the time threshold must still trigger a switch
+        ("Strict Timeout" rule). Resetting first would erase the overrun.
+        """
+        loop_ctrl = self.config.get("automation", {}).get("loop_control", {})
+        switch, action = self._check_loop_control_thresholds(loop_ctrl, result)
+        if switch:
+            await self._handle_switch_action(action)
+        self._lc_time_threshold_start_time = time.time()
+
     def _check_loop_control_thresholds(self, loop_ctrl: dict, result: dict):
         if not loop_ctrl:
             return False, "next_profile"
@@ -738,4 +749,5 @@ class AutomationManager:
             self._run_id, "switch", account=next_user,
             extra={"from": cur, "reason": "quota"})
         self.automation_status["current_account_id"] = next_user
+        self._lc_time_threshold_start_time = time.time()  # new account starts with a fresh timer
         self._needs_new_chat = True

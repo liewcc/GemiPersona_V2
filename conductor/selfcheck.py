@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import time
 from fastapi.testclient import TestClient
 
 # Add current dir to path to allow imports
@@ -71,9 +72,8 @@ def main():
 
     # Mid-run switch decision (live pending counters)
     print("Testing _should_switch...")
-    import time as _time
     mgr.config = {"automation": {"loop_control": loop_ctrl}}
-    mgr._lc_time_threshold_start_time = _time.time()
+    mgr._lc_time_threshold_start_time = time.time()
     mgr._pending_refused = 3
     switch, action = mgr._should_switch()
     assert switch is True and action == "next_profile", f"got {switch}, {action}"
@@ -110,6 +110,77 @@ def main():
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"
     assert response.json()["is_running"] is False
     print("[OK] Automation stats endpoint passed")
+
+    # Time threshold reset-on-success: behavioural checks
+    print("Testing time threshold reset-on-success...")
+
+    # (b) Behavioural check: _check_loop_control_thresholds must fire True
+    #     when the elapsed time exceeds the threshold (strict timeout).
+    mgr2 = AutomationManager(lambda: "http://localhost")
+    loop_ctrl_tt = {
+        "time_enabled": True, "time_minutes": 1, "time_action": "re_login",
+        "refused_enabled": False, "refused_threshold": 99,
+        "reset_enabled": False, "reset_threshold": 99,
+    }
+    mgr2._lc_time_threshold_start_time = time.time() - 90  # 90 s elapsed, threshold = 60 s
+    result_tt = {
+        "cycle_duration_sec": 5,
+        "cycle_refused": 0,
+        "cycle_resets": 0,
+        "time_threshold_duration_sec": time.time() - mgr2._lc_time_threshold_start_time,
+    }
+    switch_tt, action_tt = mgr2._check_loop_control_thresholds(loop_ctrl_tt, result_tt)
+    assert switch_tt is True and action_tt == "re_login", (
+        f"(b) strict timeout: expected switch=True/re_login, got {switch_tt}/{action_tt}"
+    )
+    print("[OK] (b) strict-timeout behavioural check passed")
+
+    # Ordering rule: on a cycle that succeeded but already overran the time
+    # threshold, _on_cycle_success must still trigger a switch BEFORE it
+    # restarts the timer. Resetting first would erase the overrun and the
+    # switch would never fire.
+    print("Testing strict-timeout ordering on cycle success...")
+    import asyncio as _asyncio
+    mgr3 = AutomationManager(lambda: "http://localhost")
+    mgr3.config = {"automation": {"loop_control": {
+        "time_enabled": True, "time_minutes": 1, "time_action": "re_login",
+        "refused_enabled": False, "refused_threshold": 99,
+        "reset_enabled": False, "reset_threshold": 99,
+    }}}
+    _switch_calls = []
+    _elapsed_seen = []
+
+    async def _fake_switch(action):
+        # Record what the timer looked like at the moment the switch fired.
+        _elapsed_seen.append(time.time() - mgr3._lc_time_threshold_start_time)
+        _switch_calls.append(action)
+
+    mgr3._handle_switch_action = _fake_switch
+    mgr3._lc_time_threshold_start_time = time.time() - 90  # 90 s elapsed, threshold = 60 s
+    _result3 = {
+        "cycle_duration_sec": 5,
+        "cycle_refused": 0,
+        "cycle_resets": 0,
+        "time_threshold_duration_sec": 90,
+    }
+    _asyncio.run(mgr3._on_cycle_success(_result3))
+
+    assert _switch_calls == ["re_login"], (
+        "REGRESSION (Strict Timeout): a successful cycle that overran the time "
+        f"threshold did not trigger a switch. Expected ['re_login'], got {_switch_calls}. "
+        "The most likely cause is the timer reset in _on_cycle_success being moved "
+        "ABOVE the _check_loop_control_thresholds call."
+    )
+    assert _elapsed_seen and _elapsed_seen[0] >= 60, (
+        "REGRESSION (Strict Timeout): the switch fired but the timer had already "
+        f"been reset first (elapsed at switch time was {_elapsed_seen[0]:.1f}s, expected >= 60s)."
+    )
+    assert time.time() - mgr3._lc_time_threshold_start_time < 5, (
+        "_on_cycle_success must restart the time-threshold timer after the check."
+    )
+    print("[OK] strict-timeout ordering check passed")
+
+    print("[OK] Time threshold reset-on-success and strict-timeout checks passed")
 
     print("[OK] All selfchecks passed!")
 
