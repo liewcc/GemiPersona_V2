@@ -506,7 +506,7 @@
                             <div class="d-flex align-center gap-15">
                                 <div class="slider-container" id="sliderGroupTab1">
                                     <span class="text-small text-muted">Show Last N Events:</span>
-                                    <input type="range" id="lastNEvents" min="10" max="200" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onTab1ChartSettingChange()">
+                                    <input type="range" id="lastNEvents" min="10" max="1000" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onTab1ChartSettingChange()">
                                     <span class="slider-val" id="lastNEventsVal">100</span>
                                 </div>
                                 <div class="d-flex align-center gap-10" id="yScaleGroupTab1">
@@ -1105,6 +1105,7 @@
         function renderEventHistoryChart(slicedEvents, yScale) {
             if (eventHistoryChartInstance) {
                 eventHistoryChartInstance.destroy();
+                eventHistoryChartInstance = null;
             }
             
             const ctx = document.getElementById('eventHistoryChart').getContext('2d');
@@ -1142,9 +1143,44 @@
             };
             
             const barColors = data.map(e => colorsMap[e.event_type] || '#7f8c8d');
-            
+
+            // Alternate the plot background between grey and black per account, so a
+            // switch of account is readable as a band behind the bars.
+            const accountOrder = [];
+            data.forEach(e => {
+                const a = e.account || 'N/A';
+                if (!accountOrder.includes(a)) accountOrder.push(a);
+            });
+            const bandColors = ['rgba(255, 255, 255, 0.07)', 'rgba(0, 0, 0, 0.35)'];
+            const accountBands = {
+                id: 'accountBands',
+                beforeDatasetsDraw(chart) {
+                    const { ctx, chartArea, scales } = chart;
+                    if (!chartArea || !scales.x) return;
+                    const xMin = scales.x.min !== undefined ? Math.max(0, scales.x.min) : 0;
+                    const xMax = scales.x.max !== undefined ? Math.min(data.length - 1, scales.x.max) : data.length - 1;
+                    const visibleCount = xMax - xMin + 1;
+                    if (visibleCount <= 0) return;
+                    const half = (chartArea.right - chartArea.left) / (visibleCount * 2);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+                    ctx.clip();
+                    for (let i = xMin; i <= xMax; i++) {
+                        const e = data[i];
+                        const centre = scales.x.getPixelForValue(i);
+                        const left = i === xMin ? chartArea.left : centre - half;
+                        const right = i === xMax ? chartArea.right : centre + half;
+                        ctx.fillStyle = bandColors[accountOrder.indexOf(e.account || 'N/A') % bandColors.length];
+                        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+                    }
+                    ctx.restore();
+                }
+            };
+
             eventHistoryChartInstance = new Chart(ctx, {
                 type: 'bar',
+                plugins: [accountBands],
                 data: {
                     labels: labels,
                     datasets: [{
@@ -1206,6 +1242,124 @@
                     }
                 }
             });
+
+            const canvas = document.getElementById('eventHistoryChart');
+            
+            if (canvas._ehZoomListener) {
+                canvas.removeEventListener('wheel', canvas._ehZoomListener);
+                canvas.removeEventListener('mousedown', canvas._ehPanStartListener);
+                window.removeEventListener('mousemove', canvas._ehPanMoveListener);
+                window.removeEventListener('mouseup', canvas._ehPanEndListener);
+            }
+            
+            let isPanning = false;
+            let lastPanX = 0;
+            
+            const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+            
+            canvas._ehZoomListener = function(e) {
+                e.preventDefault();
+                const chart = eventHistoryChartInstance;
+                if (!chart) return;
+                
+                const xScale = chart.scales.x;
+                const currentMin = xScale.min !== undefined ? xScale.min : 0;
+                const currentMax = xScale.max !== undefined ? xScale.max : data.length - 1;
+                const range = currentMax - currentMin;
+                
+                const zoomDir = e.deltaY > 0 ? 1 : -1;
+                if (zoomDir < 0 && range <= 4) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                
+                const valueAtMouse = xScale.getValueForPixel ? xScale.getValueForPixel(mouseX) : undefined;
+                const focusValue = typeof valueAtMouse === 'number' ? valueAtMouse : (currentMin + currentMax) / 2;
+                const focus = clamp(Math.round(focusValue), currentMin, currentMax);
+                
+                const pct = range === 0 ? 0.5 : (focus - currentMin) / range;
+                const change = Math.max(1, Math.round(range * 0.15));
+                
+                let newMin = currentMin - (zoomDir * change * pct);
+                let newMax = currentMax + (zoomDir * change * (1 - pct));
+                
+                newMin = Math.round(newMin);
+                newMax = Math.round(newMax);
+                
+                if (newMax - newMin < 4) {
+                    const shortfall = 4 - (newMax - newMin);
+                    newMin -= Math.floor(shortfall / 2);
+                    newMax += Math.ceil(shortfall / 2);
+                }
+                
+                if (newMin < 0) {
+                    newMax = Math.min(newMax - newMin, data.length - 1);
+                    newMin = 0;
+                }
+                if (newMax > data.length - 1) {
+                    newMin = Math.max(0, newMin - (newMax - (data.length - 1)));
+                    newMax = data.length - 1;
+                }
+                
+                if (newMin >= newMax && data.length > 1) return;
+                
+                chart.options.scales.x.min = newMin;
+                chart.options.scales.x.max = newMax;
+                chart.update('none');
+            };
+            
+            canvas._ehPanStartListener = function(e) {
+                isPanning = true;
+                lastPanX = e.clientX;
+                canvas.style.cursor = 'grabbing';
+            };
+            
+            canvas._ehPanMoveListener = function(e) {
+                if (!isPanning) return;
+                const chart = eventHistoryChartInstance;
+                if (!chart) return;
+                
+                const xScale = chart.scales.x;
+                const currentMin = xScale.min !== undefined ? xScale.min : 0;
+                const currentMax = xScale.max !== undefined ? xScale.max : data.length - 1;
+                const range = currentMax - currentMin;
+                
+                if (range >= data.length - 1) return;
+                
+                const dx = e.clientX - lastPanX;
+                const pxPerIndex = (xScale.right - xScale.left) / Math.max(1, range);
+                const shift = Math.round(-dx / pxPerIndex);
+                
+                if (shift !== 0) {
+                    let newMin = currentMin + shift;
+                    let newMax = currentMax + shift;
+                    
+                    if (newMin < 0) {
+                        newMin = 0;
+                        newMax = range;
+                    }
+                    if (newMax > data.length - 1) {
+                        newMax = data.length - 1;
+                        newMin = newMax - range;
+                    }
+                    
+                    chart.options.scales.x.min = newMin;
+                    chart.options.scales.x.max = newMax;
+                    chart.update('none');
+                    lastPanX = e.clientX;
+                }
+            };
+            
+            canvas._ehPanEndListener = function(e) {
+                isPanning = false;
+                canvas.style.cursor = 'grab';
+            };
+            
+            canvas.style.cursor = 'grab';
+            canvas.addEventListener('wheel', canvas._ehZoomListener, { passive: false });
+            canvas.addEventListener('mousedown', canvas._ehPanStartListener);
+            window.addEventListener('mousemove', canvas._ehPanMoveListener);
+            window.addEventListener('mouseup', canvas._ehPanEndListener);
         }
 
         function renderEventHistoryTable(slicedEvents) {
