@@ -589,6 +589,11 @@ class AutomationManager:
                         self._record_reset()
                     elif status == "reset":
                         self._record_reset()
+                    elif status == "stopped":
+                        # User-initiated interrupt (POST /engine/interrupt). Not a
+                        # failure: exit the loop cleanly without recording a reset.
+                        logger.info("Wait interrupted by stop signal; ending loop.")
+                        break
                     else:
                         logger.warning(f"Unhandled wait status: {status}; treating as reset")
                         self._record_reset()

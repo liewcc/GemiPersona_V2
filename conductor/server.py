@@ -181,6 +181,14 @@ async def continue_automation(req: AutomationRequest):
 @app.post("/browser/automation/stop")
 async def stop_automation():
     automation_manager.stop()
+    # Unblock any in-flight engine wait so the loop exits within ~2s instead of
+    # up to the wait_response timeout (180s). Best-effort: the loop's own stop
+    # flag is authoritative; this just makes it react fast.
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(get_engine_url() + "/engine/interrupt")
+    except Exception as e:
+        logger.warning(f"automation stop: interrupt post failed: {e}")
     return {"status": "success"}
 
 @app.post("/browser/automation/request_new_chat")
