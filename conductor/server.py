@@ -79,10 +79,10 @@ async def ensure_service():
             except Exception as e:
                 logger.error(f"Failed to register with engine: {e}")
 
-    async def _probe():
+    async def _probe(timeout=1.0):
         """Return True if the engine answers /health (and register if it's new)."""
         try:
-            async with httpx.AsyncClient(timeout=1.0) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.get(f"{url}/health")
                 if resp.status_code == 200:
                     await _check_and_register(resp)
@@ -90,6 +90,29 @@ async def ensure_service():
         except Exception:
             pass
         return False
+
+    async def _port_open():
+        """True if something is already listening on the engine port.
+
+        A long-running browser step (wait_response, redo, ...) can block the
+        engine's event loop past the /health timeout even though the process
+        is alive — a TCP connect still succeeds because the listener socket
+        itself isn't blocked. Spawning a second engine in that case can't
+        bind the port anyway (WinError 10048) and just wastes a process.
+        """
+        port = get_engine_port()
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection("127.0.0.1", port), timeout=1.0
+            )
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
 
     # Fast path: engine already up — no lock, no contention on the hot proxy path.
     if await _probe():
@@ -99,8 +122,19 @@ async def ensure_service():
     # duplicate engine process (the previous behaviour spawned N ghosts on races).
     async with _spawn_lock:
         # Re-check: another caller may have spawned while we waited for the lock.
-        if await _probe():
+        if await _probe(timeout=1.5):
             return True
+
+        if await _port_open():
+            # Engine process is alive and holding the port, just still busy.
+            # Keep polling instead of spawning a duplicate that can't bind.
+            start_time = time.time()
+            while time.time() - start_time < 20:
+                if await _probe(timeout=1.5):
+                    return True
+                await asyncio.sleep(1)
+            logger.error("Engine port is open but /health never responded within 20s.")
+            return False
 
         logger.info("Engine unreachable. Spawning new engine process...")
         try:
@@ -227,12 +261,16 @@ async def health_summary(date_from: str = None, date_to: str = None,
 async def health_runs(limit: int = 50):
     return {"runs": health_db.list_runs(limit)}
 
-@app.post("/health/clear")
-async def health_clear(data: dict = Body(...)):
-    before = data.get("before")
-    if not before:
-        return JSONResponse(status_code=422, content={"detail": "'before' (YYYY-MM-DD) required"})
-    return {"deleted": health_db.delete_before(before)}
+@app.post("/health/runs/delete")
+async def health_run_delete(data: dict = Body(...)):
+    run_id = data.get("run_id")
+    if not run_id:
+        return JSONResponse(status_code=422, content={"detail": "'run_id' required"})
+    return {"deleted": health_db.delete_run(run_id)}
+
+@app.post("/health/runs/delete_all")
+async def health_runs_delete_all():
+    return {"deleted": health_db.delete_all_runs()}
 
 @app.get("/engine/refused_keywords")
 async def get_refused_keywords_ep():

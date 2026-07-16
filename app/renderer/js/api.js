@@ -267,8 +267,12 @@ const api = {
         return this.request(`/health/runs?limit=${limit}`);
     },
 
-    clearHealthBefore(dateStr) {
-        return this.request('/health/clear', 'POST', { before: dateStr });
+    deleteHealthRun(runId) {
+        return this.request('/health/runs/delete', 'POST', { run_id: runId });
+    },
+
+    deleteAllHealthRuns() {
+        return this.request('/health/runs/delete_all', 'POST', {});
     },
 
     continueAutomation(mode, goal, config, clearPending = false) {

@@ -227,17 +227,13 @@
         /* Rebuilt Tab 2 Styles: Split Panel Dashboard & Timeline */
         .split-layout {
             display: grid;
-            grid-template-columns: 6.2fr 3.8fr;
+            grid-template-columns: 1fr;
             gap: 20px;
             width: 100%;
             margin-top: 10px;
         }
         
         .split-left {
-            width: 100%;
-        }
-        
-        .split-right {
             width: 100%;
         }
 
@@ -300,75 +296,8 @@
             color: var(--text-main);
         }
 
-        .interactive-table tbody tr {
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        
         .interactive-table tbody tr:hover {
             background: rgba(255, 255, 255, 0.03);
-        }
-        
-        .interactive-table tbody tr.selected-row {
-            background: rgba(163, 100, 255, 0.08) !important;
-            border-left: 3px solid var(--accent);
-        }
-
-        .timeline-wrapper {
-            position: relative;
-            padding: 10px 0 20px 20px;
-            margin-left: 15px;
-            border-left: 2px solid var(--border);
-            overflow-y: auto;
-            flex-grow: 1;
-            min-height: 0;
-        }
-        
-        .timeline-node {
-            position: relative;
-            margin-bottom: 18px;
-            padding-left: 10px;
-        }
-        
-        .timeline-node::before {
-            content: '';
-            position: absolute;
-            left: -27px;
-            top: 2px;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--border);
-            border: 2px solid var(--bg-secondary);
-            box-shadow: 0 0 0 2px var(--border);
-            transition: var(--transition);
-        }
-        
-        .timeline-node.node-start::before { background: var(--success); box-shadow: 0 0 6px var(--success); }
-        .timeline-node.node-switch::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-        .timeline-node.node-success::before { background: #2ecc71; }
-        .timeline-node.node-refused::before { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
-        .timeline-node.node-reset::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
-        .timeline-node.node-stop::before { background: #95a5a6; }
-        
-        .timeline-node .node-time {
-            font-size: 9px;
-            font-family: var(--font-mono);
-            color: var(--text-muted);
-            margin-bottom: 2px;
-        }
-        
-        .timeline-node .node-header {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-main);
-            margin-bottom: 2px;
-        }
-        
-        .timeline-node .node-body {
-            font-size: 10px;
-            color: var(--text-muted);
-            line-height: 1.4;
         }
 
         /* Badges */
@@ -553,30 +482,16 @@
                 <div id="tab-management" class="tab-content" style="padding: 15px; box-sizing: border-box;">
                     <!-- Controls Card -->
                     <div class="card glass controls-card" style="flex-shrink: 0;">
-                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase; margin-bottom: 15px;">Data Filter & Maintenance - date range and account apply to the Account Health Analysis charts</div>
-                        <div class="controls-row d-flex-between">
-                            <div class="d-flex gap-15 align-center flex-wrap">
-                                <div class="control-group">
-                                    <label class="text-small text-muted" for="dateFrom">From:</label>
-                                    <input type="date" class="form-control" id="dateFrom" onchange="onFilterChange()">
-                                </div>
-                                <div class="control-group">
-                                    <label class="text-small text-muted" for="dateTo">To:</label>
-                                    <input type="date" class="form-control" id="dateTo" onchange="onFilterChange()">
-                                </div>
-                                <div class="control-group">
-                                    <label class="text-small text-muted" for="accountFilter">Account:</label>
-                                    <select class="form-control" id="accountFilter" onchange="onFilterChange()">
-                                        <option value="">All accounts</option>
-                                    </select>
-                                </div>
-                                <button class="btn btn-primary" onclick="onRefreshAll()">Refresh</button>
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase; margin-bottom: 15px;">Automation Runs Maintenance</div>
+                        <div class="d-flex gap-10 align-center flex-wrap">
+                            <div class="control-group flex-grow-1">
+                                <label class="text-small text-muted" for="runDeleteSelect">Run:</label>
+                                <select class="form-control" id="runDeleteSelect">
+                                    <option value="">No runs recorded</option>
+                                </select>
                             </div>
-                            <div class="d-flex gap-10 align-center">
-                                <label class="text-small text-muted" for="clearDate">Older than:</label>
-                                <input type="date" class="form-control" id="clearDate">
-                                <button class="btn btn-danger" onclick="clearOldData()">Clear</button>
-                            </div>
+                            <button class="btn btn-danger" onclick="deleteSelectedRun()">Delete</button>
+                            <button class="btn btn-danger" onclick="deleteAllRuns()">Delete All</button>
                         </div>
                     </div>
 
@@ -620,7 +535,6 @@
                                 <div class="d-flex align-center justify-between mb-15" style="flex-shrink: 0;">
                                     <div>
                                         <h3 class="m-0" style="font-size: 14px; font-weight: 600;">Automation Runs List</h3>
-                                        <p class="text-muted text-small mb-0">Select a row to inspect its chronological timeline on the right.</p>
                                     </div>
                                     <button class="btn" onclick="fetchRunsTab(true)" title="Refresh Run Data">🔄 Refresh</button>
                                 </div>
@@ -649,54 +563,6 @@
                             </div>
                         </div>
 
-                        <!-- Right Column: Timeline Detail Panel -->
-                        <div class="split-right">
-                            <!-- Run Details card (hidden until row clicked) -->
-                            <div class="card glass p-15 hidden" id="runDetailCard" style="min-height: 540px; display: flex; flex-direction: column;">
-                                <div id="timelineDetailContent" class="d-flex flex-column" style="height: 100%; flex-grow: 1;">
-                                    <div class="d-flex align-center justify-between mb-15 pb-10" style="border-bottom: 1px solid var(--border);">
-                                        <div>
-                                            <h3 class="m-0" id="timelineTitle" style="font-size: 15px; font-weight: 600; word-break: break-all;">Run Details</h3>
-                                            <span id="timelineStatusBadge" class="status-badge mt-5" style="display: inline-block;">Completed</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Info cards using grid-2 -->
-                                    <div class="grid-2 gap-10 mb-15" style="flex-shrink: 0;">
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
-                                            <span class="text-muted text-small">Start Time</span>
-                                            <span class="text-small font-weight-500" id="timelineStartVal" style="font-family: var(--font-mono);">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
-                                            <span class="text-muted text-small">Stop Time</span>
-                                            <span class="text-small font-weight-500" id="timelineStopVal" style="font-family: var(--font-mono);">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
-                                            <span class="text-muted text-small">Duration</span>
-                                            <span class="text-small font-weight-500" id="timelineDurationVal">-</span>
-                                        </div>
-                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
-                                            <span class="text-muted text-small">Events</span>
-                                            <span class="text-small font-weight-500" id="timelineEventsVal">-</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Timeline container -->
-                                    <div style="flex-grow: 1; position: relative; min-height: 380px;">
-                                        <div class="timeline-wrapper" id="timelineNodesContainer" style="position: absolute; inset: 0; overflow-y: auto;">
-                                            <!-- Chronological nodes -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Placeholder to prompt user to select a run -->
-                            <div class="card glass p-15 d-flex align-center justify-center text-center text-muted" id="runDetailPlaceholder" style="min-height: 540px;">
-                                <div>
-                                    <div style="font-size: 32px; margin-bottom: 12px;">🏃‍♂️</div>
-                                    <div>Select an automation run from the list to view its detail timeline.</div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -789,8 +655,6 @@
         let showTableModeTab1 = false;
 
         let runsListCache = [];
-        let selectedRunId = null;
-        let isAutomationRunning = false;
 
         let tab3RunsList = [];
 
@@ -819,33 +683,6 @@
             }
         }
 
-        // Initialize dates
-        function initDateInputs() {
-            const today = new Date();
-            
-            // Format YYYY-MM-DD helper using local time
-            const formatLocalDate = (date) => {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-
-            const dateToVal = formatLocalDate(today);
-            
-            const sixDaysAgo = new Date();
-            sixDaysAgo.setDate(today.getDate() - 6);
-            const dateFromVal = formatLocalDate(sixDaysAgo);
-
-            document.getElementById('dateTo').value = dateToVal;
-            document.getElementById('dateFrom').value = dateFromVal;
-            
-            // Clear date defaults to 30 days ago
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(today.getDate() - 30);
-            document.getElementById('clearDate').value = formatLocalDate(thirtyDaysAgo);
-        }
-
         // Display status helper
         function showStatus(msg, type = 'error') {
             const banner = document.getElementById('statusBanner');
@@ -862,38 +699,6 @@
             }
         }
 
-        // Populate account filter select list dynamically
-        function updateAccountFilter(summaryData) {
-            const select = document.getElementById('accountFilter');
-            const currentVal = select.value;
-            
-            // Re-build select
-            select.innerHTML = '<option value="">All accounts</option>';
-            
-            const accounts = new Set();
-            if (Array.isArray(summaryData)) {
-                summaryData.forEach(row => {
-                    if (row.grp) {
-                        accounts.add(row.grp);
-                    }
-                });
-            }
-            
-            Array.from(accounts).sort().forEach(acc => {
-                const opt = document.createElement('option');
-                opt.value = acc;
-                opt.textContent = acc;
-                if (acc === currentVal) {
-                    opt.selected = true;
-                }
-                select.appendChild(opt);
-            });
-        }
-
-        function onFilterChange() {
-            loadAllData();
-        }
-
         async function onRefreshAll() {
             await loadAllData();
             await fetchRunsTab(true);
@@ -902,23 +707,16 @@
         // Main data loading function
         async function loadAllData() {
             clearStatus();
-            const dateFrom = document.getElementById('dateFrom').value;
-            const dateTo = document.getElementById('dateTo').value;
-            const account = document.getElementById('accountFilter').value;
 
             try {
-                // 1. Fetch Aggregates/Summary for Chart 1 and Account Filter
-                const summaryResp = await api.getHealthSummary({ date_from: dateFrom, date_to: dateTo, group_by: 'account' });
+                // 1. Fetch Aggregates/Summary for Chart 1
+                const summaryResp = await api.getHealthSummary({ group_by: 'account' });
                 const summaryData = summaryResp.summary || [];
                 tab1SummaryCache = summaryData;
-                updateAccountFilter(summaryData);
                 renderBarChart(summaryData);
 
                 // 2. Fetch Events for Line Chart
-                const eventsParams = { date_from: dateFrom, date_to: dateTo, limit: 2000 };
-                if (account) {
-                    eventsParams.account = account;
-                }
+                const eventsParams = { limit: 2000 };
                 const eventsResp = await api.getHealthEvents(eventsParams);
                 const eventsData = eventsResp.events || [];
                 renderLineChart(eventsData);
@@ -1032,29 +830,7 @@
             });
         }
 
-        // Clear health database entries helper
-        async function clearOldData() {
-            clearStatus();
-            const clearDate = document.getElementById('clearDate').value;
-            if (!clearDate) {
-                alert("Please select a valid date.");
-                return;
-            }
-
-            if (!confirm(`Are you sure you want to permanently delete all health events recorded prior to ${clearDate}?`)) {
-                return;
-            }
-
-            try {
-                const res = await api.clearHealthBefore(clearDate);
-                const count = res.deleted || 0;
-                showStatus(`Successfully cleared ${count} old events.`, 'success');
-                loadAllData();
-                fetchRunsTab(true);
-            } catch (err) {
-                showStatus("Failed to clear old data: " + err.message, 'error');
-            }
-        }
+        // Clear health database entries helper removed
 
         // ── Tab 1: Event History Implementation ──
         function renderEventHistory() {
@@ -1433,17 +1209,7 @@
                 document.getElementById('summaryTotalResets').textContent = totalResets;
                 
                 renderRunsListTable(runs);
-                
-                if (selectedRunId) {
-                    const stillExists = runs.some(r => r.run_id === selectedRunId);
-                    if (stillExists) {
-                        showRunDetail(selectedRunId);
-                    } else {
-                        hideRunDetail();
-                    }
-                } else {
-                    hideRunDetail();
-                }
+                renderRunDeleteMenu(runs);
             } catch (err) {
                 console.error("Failed to load runs tab data:", err);
             }
@@ -1461,21 +1227,14 @@
             runs.forEach(run => {
                 const tr = document.createElement('tr');
                 tr.className = 'run-row';
-                if (run.run_id === selectedRunId) {
-                    tr.classList.add('selected-row');
-                }
-                
-                tr.onclick = () => {
-                    document.querySelectorAll('#managementDataTable tbody tr').forEach(r => r.classList.remove('selected-row'));
-                    tr.classList.add('selected-row');
-                    showRunDetail(run.run_id);
-                };
                 
                 // run_id is a 'YYYYMMDD-HHMMSS' stamp — truncating it collapses every
                 // run from the same day into one indistinguishable label.
                 const runIdShort = run.run_id || 'N/A';
                 const startStr = run.start_ts ? new Date(run.start_ts * 1000).toLocaleString() : 'N/A';
-                const endStr = run.end_ts ? new Date(run.end_ts * 1000).toLocaleString() : 'N/A';
+                // Blank while the run is still in progress — the conductor sends
+                // end_ts only once a run has actually finished.
+                const endStr = run.end_ts ? new Date(run.end_ts * 1000).toLocaleString() : '';
                 
                 tr.innerHTML = `
                     <td style="font-family: var(--font-mono); font-size: 12px; color: #a0a0ff;">${runIdShort}</td>
@@ -1491,152 +1250,32 @@
             });
         }
 
-        async function showRunDetail(runId) {
-            selectedRunId = runId;
-            
-            document.getElementById('runDetailCard').classList.remove('hidden');
-            document.getElementById('runDetailPlaceholder').classList.add('hidden');
-            
-            const run = runsListCache.find(r => r.run_id === runId);
-            
-            document.getElementById('timelineTitle').textContent = `Run ${runId}`;
-            
-            const container = document.getElementById('timelineNodesContainer');
-            container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px;">⏳ Loading event timeline...</div>';
-            
-            try {
-                const eventsResp = await api.getHealthEvents({ run_id: runId, limit: 2000 });
-                const events = eventsResp.events || [];
-                
-                const hasEnd = events.some(e => e.event_type === 'run_end');
-                const badge = document.getElementById('timelineStatusBadge');
-                // run.end_ts is MAX(ts), not an end marker — it is set for every run,
-                // so only a run_end event proves completion.
-                const isNewestRun = runsListCache.length > 0 && runsListCache[0].run_id === runId;
-                const inProgress = !hasEnd && isAutomationRunning && isNewestRun;
-                if (hasEnd) {
-                    badge.textContent = 'Completed';
-                    badge.className = 'status-badge status-success';
-                } else if (inProgress) {
-                    badge.textContent = 'In Progress';
-                    badge.className = 'status-badge status-refused';
-                } else {
-                    badge.textContent = 'Interrupted';
-                    badge.className = 'status-badge status-reset';
-                }
-
-                const startTs = run ? run.start_ts : (events.length > 0 ? events[events.length - 1].ts : null);
-                // A still-running run has no stop time: run.end_ts would just be its
-                // latest event, which would read as if the run had already stopped.
-                const endTs = inProgress
-                    ? null
-                    : (run ? run.end_ts : (hasEnd ? events.find(e => e.event_type === 'run_end').ts : null));
-                
-                document.getElementById('timelineStartVal').textContent = startTs ? new Date(startTs * 1000).toLocaleString() : 'N/A';
-                document.getElementById('timelineStopVal').textContent = endTs ? new Date(endTs * 1000).toLocaleString() : 'N/A';
-                
-                let durationStr = 'N/A';
-                if (startTs && endTs) {
-                    const diffSec = endTs - startTs;
-                    durationStr = formatDuration(diffSec);
-                } else if (startTs) {
-                    const diffSec = Math.floor(Date.now() / 1000) - startTs;
-                    durationStr = formatDuration(diffSec) + ' (Active)';
-                }
-                document.getElementById('timelineDurationVal').textContent = durationStr;
-                document.getElementById('timelineEventsVal').textContent = events.length;
-                
-                const chronoEvents = [...events].reverse();
-                container.innerHTML = '';
-                
-                chronoEvents.forEach(e => {
-                    const node = document.createElement('div');
-                    let nodeClass = 'timeline-node';
-                    let headerText = '';
-                    let bodyText = '';
-                    
-                    let extraObj = {};
-                    if (e.extra) {
-                        try {
-                            extraObj = typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra;
-                        } catch(err) {
-                            extraObj = { text: String(e.extra) };
-                        }
-                    }
-                    
-                    const timeStr = new Date(e.ts * 1000).toLocaleTimeString();
-                    
-                    switch (e.event_type) {
-                        case 'run_start':
-                        case 'run_resume':
-                            nodeClass += ' node-start';
-                            headerText = e.event_type === 'run_start' ? 'Run started' : 'Run resumed';
-                            const mode = extraObj.mode || 'N/A';
-                            const goal = extraObj.goal || 'N/A';
-                            bodyText = `Mode: ${mode} | Goal: ${goal}`;
-                            break;
-                        case 'switch':
-                            nodeClass += ' node-switch';
-                            headerText = `Switched to ${e.account || 'Unknown'}`;
-                            const fromAcc = extraObj.from || 'N/A';
-                            const reason = extraObj.reason || 'N/A';
-                            bodyText = `From: ${fromAcc} | Reason: ${reason}`;
-                            break;
-                        case 'success':
-                            nodeClass += ' node-success';
-                            headerText = 'Image saved';
-                            const filename = e.filename || 'N/A';
-                            const duration = e.duration_sec ? `${e.duration_sec}s` : 'N/A';
-                            const cycleIdx = e.cycle_index !== undefined ? e.cycle_index : 'N/A';
-                            bodyText = `File: ${filename} (Duration: ${duration}, Cycle #${cycleIdx})`;
-                            break;
-                        case 'refused':
-                            nodeClass += ' node-refused';
-                            headerText = 'AI refused';
-                            bodyText = extraObj.text ? extraObj.text.substring(0, 100) : 'No reason provided';
-                            break;
-                        case 'reset':
-                        case 're_login':
-                            nodeClass += ' node-reset';
-                            headerText = e.event_type === 'reset' ? 'Safety reset' : 'Re-login';
-                            bodyText = extraObj.reason || extraObj.text || '';
-                            break;
-                        case 'quota':
-                            nodeClass += ' node-refused';
-                            headerText = 'Quota hit';
-                            bodyText = extraObj.text || 'Account hit quota limit.';
-                            break;
-                        case 'run_end':
-                            nodeClass += ' node-stop';
-                            headerText = 'Run ended';
-                            const successes = extraObj.successes || 0;
-                            const resets = extraObj.resets || 0;
-                            bodyText = `Totals: Successes: ${successes} | Resets: ${resets}`;
-                            break;
-                        default:
-                            nodeClass += '';
-                            headerText = e.event_type;
-                            bodyText = JSON.stringify(extraObj);
-                    }
-                    
-                    node.className = nodeClass;
-                    node.innerHTML = `
-                        <div class="node-time">${timeStr}</div>
-                        <div class="node-header">${headerText}</div>
-                        <div class="node-body">${bodyText}</div>
-                    `;
-                    container.appendChild(node);
-                });
-            } catch (err) {
-                console.error("Failed to load run timeline:", err);
-                container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 11px;">⚠️ Failed to load timeline detail: ${err.message}</div>`;
-            }
+        function renderRunDeleteMenu(runs) {
+            const sel = document.getElementById('runDeleteSelect');
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = runs.length
+                ? runs.map(r => `<option value="${r.run_id}">${r.run_id} — ${r.start_ts ? new Date(r.start_ts * 1000).toLocaleString() : 'N/A'}</option>`).join('')
+                : '<option value="">No runs recorded</option>';
+            if (prev && runs.some(r => r.run_id === prev)) sel.value = prev;
         }
 
-        function hideRunDetail() {
-            selectedRunId = null;
-            document.getElementById('runDetailCard').classList.add('hidden');
-            document.getElementById('runDetailPlaceholder').classList.remove('hidden');
+        async function deleteSelectedRun() {
+            const runId = document.getElementById('runDeleteSelect').value;
+            if (!runId) return;
+            if (!confirm(`Permanently delete all health events for run ${runId}?`)) return;
+            try {
+                await api.deleteHealthRun(runId);
+                await onRefreshAll();
+            } catch (err) { alert('Delete failed: ' + err.message); }
+        }
+
+        async function deleteAllRuns() {
+            if (!confirm('Permanently delete ALL automation run records? This cannot be undone.')) return;
+            try {
+                await api.deleteAllHealthRuns();
+                await onRefreshAll();
+            } catch (err) { alert('Delete failed: ' + err.message); }
         }
 
         // ── Tab 3: Run Performance Insights Implementation ──
@@ -2170,10 +1809,6 @@
                     const autoBadge = document.getElementById('autoStatusBadge');
                     
                     if (stats) {
-                        // Cached for Tab 2's run badge; the conductor does not expose the
-                        // live run_id, so "in progress" = automation running + newest run.
-                        isAutomationRunning = !!stats.is_running;
-
                         if (stats.is_running) {
                             changed |= updateElementState(autoBadge, 'RUNNING', 'job-status-badge conn-badge-connected');
                         } else if (stats.cycles > 0) {
@@ -2262,7 +1897,6 @@
 
         // Run on page load
         document.addEventListener('DOMContentLoaded', () => {
-            initDateInputs();
             restoreStatusCardsCache();
             updateStatusHeader();
             setInterval(updateStatusHeader, 3000);
