@@ -49,13 +49,53 @@ ipcMain.handle('save-file', async (event, options) => {
   return result.filePath;
 });
 
+// Bring an already-open Explorer window for `dirPath` to the front.
+// Resolves true if one was found and activated, false otherwise.
+// ponytail: shells out to PowerShell + Shell.Application COM instead of adding a
+// native addon. Ceiling: ~200ms per call and Windows-only; upgrade path is a
+// node-ffi/koffi binding to FindWindow/SetForegroundWindow if this ever gets hot.
+function focusExistingExplorerWindow(dirPath) {
+  if (process.platform !== 'win32') return Promise.resolve(false);
+  const target = path.resolve(dirPath);
+  const ps = `
+$ErrorActionPreference='Stop'
+Add-Type -Namespace W -Name N -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);'
+$target = [System.IO.Path]::GetFullPath($env:GP_TARGET_DIR).TrimEnd('\\')
+foreach ($w in (New-Object -ComObject Shell.Application).Windows()) {
+  try { $p = $w.Document.Folder.Self.Path } catch { continue }
+  if ($p -and $p.TrimEnd('\\') -ieq $target) {
+    [void][W.N]::ShowWindow([IntPtr]$w.HWND, 9)
+    [void][W.N]::SetForegroundWindow([IntPtr]$w.HWND)
+    'FOUND'; exit 0
+  }
+}
+'NONE'`;
+  return new Promise(resolve => {
+    execFile('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-STA', '-Command', ps],
+      { timeout: 5000, env: { ...process.env, GP_TARGET_DIR: target } },
+      (err, stdout) => resolve(!err && /FOUND/.test(stdout))
+    );
+  });
+}
+
 ipcMain.handle('open-file', async (event, filePath) => {
   if (!fs.existsSync(filePath)) {
     return 'Path does not exist';
   }
-  shell.openPath(filePath).catch(err => {
-    console.error('Failed to open path:', err);
-  });
+  let handled = false;
+  try {
+    if (fs.statSync(filePath).isDirectory()) {
+      handled = await focusExistingExplorerWindow(filePath);
+    }
+  } catch (err) {
+    console.error('Explorer window lookup failed:', err);
+  }
+  if (!handled) {
+    shell.openPath(filePath).catch(err => {
+      console.error('Failed to open path:', err);
+    });
+  }
   return '';
 });
 
