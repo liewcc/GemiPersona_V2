@@ -614,12 +614,8 @@
 
             // Check transition of registration_active from true to false (registration finished)
             if (_prevRegActive && !regActive) {
-                console.log("Registration browser closed. Refreshing profiles list...");
-                setStatus('Registration closed. Refreshing profile list...');
-                setTimeout(async () => {
-                    await loadProfiles();
-                    setStatus('Profile list updated.');
-                }, 1200);
+                console.log("Registration browser closed. Finalizing...");
+                handleRegistrationFinished();
             }
             _prevRegActive = regActive;
             _isBrowserRunning = isBrowserRunning;
@@ -1023,6 +1019,34 @@
                 console.error(err);
                 setStatus('Failed to start registration: ' + err.message, true);
             }
+        }
+
+        async function handleRegistrationFinished() {
+            setStatus('Registration closed. Finalizing profile...');
+            for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 1000));
+                try {
+                    const status = await api.getBrowserStatus();
+                    if (status && status.last_registration_result) {
+                        const result = status.last_registration_result;
+                        if (result.status === 'success') {
+                            await loadProfiles();
+                            setStatus('New profile created: ' + result.profile);
+                        } else if (result.status === 'discarded') {
+                            await loadProfiles();
+                            setStatus('No Google login was detected - the new profile was NOT saved. Please try again and sign in before closing the browser.', true);
+                        } else if (result.status === 'error') {
+                            await loadProfiles();
+                            setStatus('Profile registration failed: ' + (result.message || 'unknown error'), true);
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    // Ignore errors during polling, browser might be restarting
+                }
+            }
+            await loadProfiles();
+            setStatus('Registration finished but result unknown. Profile list refreshed.', true);
         }
     </script>
 </body>
