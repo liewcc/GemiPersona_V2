@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GemiPersona V2 - Account Health</title>
-    <link rel="stylesheet" href="styles/main.css">
+    <link class="seo-title" rel="stylesheet" href="styles/main.css">
     <style>
+        /* Existing V2 CSS */
         .health-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -15,7 +16,7 @@
             flex-grow: 1;
         }
         .chart-card {
-            height: 350px;
+            min-height: 0;
             display: flex;
             flex-direction: column;
         }
@@ -23,7 +24,12 @@
             position: relative;
             flex-grow: 1;
             width: 100%;
-            height: calc(100% - 30px);
+            min-height: 0;
+        }
+        .chart-container > canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
         }
         .controls-card {
             padding: 16px;
@@ -102,20 +108,316 @@
             margin-bottom: 15px;
             text-transform: uppercase;
         }
-        .content-scroll-area {
+
+        /* DT Imported styles */
+        /* Tabs Header styling */
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            gap: 10px;
+            padding-bottom: 0;
+        }
+        
+        .tab-btn {
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            padding: 10px 15px;
+            font-weight: 500;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: var(--font-sans);
+        }
+        
+        .tab-btn:hover {
+            color: var(--text-main);
+            border-bottom-color: hsla(263, 80%, 65%, 0.3);
+        }
+        
+        .tab-btn.active {
+            color: var(--text-main);
+            border-bottom-color: var(--accent) !important;
+            font-weight: 600;
+        }
+        
+        .tab-content {
+            display: none;
+            position: absolute;
+            inset: 0;
             overflow-y: auto;
-            height: calc(100vh - 40px);
-            padding: 20px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Tab 1 needs internal flex layout for the chart to fill height */
+        #tab-analysis.active {
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── In-sidebar Account Status block ─────────────────────── */
+        .sidebar-account-panel {
+            margin-top: 16px;
+            padding: 12px 10px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-grow: 1;            /* pushes to fill remaining sidebar height */
+            /* min-height:0 is what actually lets overflow-y work: a flex item
+               defaults to min-height:auto, i.e. its content height, so without
+               this the panel grows past the sidebar instead of scrolling. */
+            min-height: 0;
+            overflow-y: auto;
+            transition: opacity 0.2s ease;
+        }
+
+        .sidebar-account-panel.hidden {
+            display: none;
+        }
+
+        .sidebar-account-title {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #a0a0ff;
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+
+        /* Individual account row cards inside the sidebar */
+        .account-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 9px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: border-color 0.18s ease;
+        }
+
+        .account-card.is-active {
+            border-color: var(--border-focus);
+            background: rgba(163, 100, 255, 0.08);
+        }
+
+        .account-card .acct-name {
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .account-card .acct-meta {
+            font-size: 9px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Rebuilt Tab 2 Styles: Split Panel Dashboard & Timeline */
+        .split-layout {
+            display: grid;
+            grid-template-columns: 6.2fr 3.8fr;
+            gap: 20px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .split-left {
+            width: 100%;
+        }
+        
+        .split-right {
+            width: 100%;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        
+        .summary-card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: var(--transition);
+        }
+        
+        .summary-card:hover {
+            border-color: var(--border-focus);
+            background: rgba(30, 36, 45, 0.5);
+        }
+        
+        .summary-icon {
+            font-size: 22px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.05);
+            flex-shrink: 0;
+        }
+        
+        .summary-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        
+        .summary-info .stat-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .summary-info .stat-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .interactive-table tbody tr {
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .interactive-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .interactive-table tbody tr.selected-row {
+            background: rgba(163, 100, 255, 0.08) !important;
+            border-left: 3px solid var(--accent);
+        }
+
+        .timeline-wrapper {
+            position: relative;
+            padding: 10px 0 20px 20px;
+            margin-left: 15px;
+            border-left: 2px solid var(--border);
+            overflow-y: auto;
             flex-grow: 1;
+            min-height: 0;
+        }
+        
+        .timeline-node {
+            position: relative;
+            margin-bottom: 18px;
+            padding-left: 10px;
+        }
+        
+        .timeline-node::before {
+            content: '';
+            position: absolute;
+            left: -27px;
+            top: 2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            border: 2px solid var(--bg-secondary);
+            box-shadow: 0 0 0 2px var(--border);
+            transition: var(--transition);
+        }
+        
+        .timeline-node.node-start::before { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .timeline-node.node-switch::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+        .timeline-node.node-success::before { background: #2ecc71; }
+        .timeline-node.node-refused::before { background: var(--warning); box-shadow: 0 0 6px var(--warning); }
+        .timeline-node.node-reset::before { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+        .timeline-node.node-stop::before { background: #95a5a6; }
+        
+        .timeline-node .node-time {
+            font-size: 9px;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+        
+        .timeline-node .node-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+        
+        .timeline-node .node-body {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Badges */
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-success { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
+        .status-refused { background: rgba(160, 160, 255, 0.15); color: #a0a0ff; }
+        .status-reset { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
+        .status-fail { background: rgba(255, 153, 153, 0.15); color: #ff9999; }
+        
+        /* Slider styling */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .slider-val {
+            min-width: 30px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--accent);
+            font-family: var(--font-sans);
+        }
+        
+        input[type="range"] {
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* Data Table container */
+        .table-container {
+            width: 100%;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: rgba(0, 0, 0, 0.2);
         }
     </style>
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar Navigation -->
-        <div class="sidebar">
+        <div class="sidebar" style="overflow: hidden; display: flex; flex-direction: column;">
             <a href="setup.html" class="nav-item">
                 ⚙️ Setup
             </a>
@@ -134,86 +436,341 @@
             <a href="#" class="nav-item" onclick="triggerOpenDownloadFolder(event)">
                 📂 Open Download Folder
             </a>
+
+            <!-- Account Status Sidebar Panel -->
+            <div class="sidebar-account-panel" id="accountSidePanel">
+                <div class="sidebar-account-title">👥 Account Status</div>
+                <div id="accountStatusList" style="display:flex; flex-direction:column; gap:6px;">
+                    <span style="font-size:11px; color:var(--text-muted);">Loading...</span>
+                </div>
+            </div>
         </div>
 
         <!-- Main Content -->
-        <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column;">
-            <div class="content-scroll-area">
-                <!-- Status Div -->
-                <div id="statusBanner" class="status-banner"></div>
+        <div class="main-content" style="height: 100vh; overflow: hidden; display: flex; flex-direction: column; padding: 20px;">
+            <!-- Top Status Bar -->
+            <div class="grid-2 mb-24" style="flex-shrink: 0;">
+                <!-- Browser Status -->
+                <div class="d-flex align-center justify-between glass" id="browserStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px;">
+                    <div class="d-flex align-center gap-8">
+                        <span id="engineStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">ENGINE OFF</span>
+                        <span id="browserStatusText" class="job-status-badge conn-badge-disconnected" style="cursor: default;">BROWSER OFFLINE</span>
+                    </div>
+                    <div><span class="font-weight-600">Log in:</span> <span id="browserAccountText" class="text-muted">Not Ready</span></div>
+                </div>
+                
+                <!-- Automation Stats -->
+                <div class="d-flex align-center justify-between glass" id="autoStatusBar" style="padding: 0 16px; height: 40px; border-radius: var(--radius-sm); font-size: 13px; white-space: nowrap; overflow: hidden;">
+                    <div><span id="autoStatusBadge" class="job-status-badge conn-badge-disconnected" style="cursor: default; margin-right: 8px;">OFFLINE</span> | Cycles: <span id="statCycles" class="font-weight-600">0</span> | Images: <span id="statImages" class="font-weight-600">0</span> | Refused: <span id="statRefused" class="font-weight-600">0</span> | Resets: <span id="statResets" class="font-weight-600">0</span></div>
+                </div>
+            </div>
 
-                <!-- Controls Card -->
-                <div class="card glass controls-card">
-                    <div class="controls-row d-flex-between">
-                        <div class="d-flex gap-15 align-center flex-wrap">
-                            <div class="control-group">
-                                <label class="text-small text-muted" for="dateFrom">From:</label>
-                                <input type="date" class="form-control" id="dateFrom">
+            <!-- Tab Headers -->
+            <div class="tabs-header mb-20" style="flex-shrink: 0;">
+                <button class="tab-btn active" data-tab="tab-analysis" onclick="switchTab('tab-analysis')">Account Health Analysis</button>
+                <button class="tab-btn" data-tab="tab-management" onclick="switchTab('tab-management')">Run Management</button>
+                <button class="tab-btn" data-tab="tab-insights" onclick="switchTab('tab-insights')">Run Performance Insights</button>
+            </div>
+
+            <!-- Tab Contents Container -->
+            <div class="flex-grow-1" style="position: relative; overflow: hidden; min-height: 0;">
+                
+                <!-- Tab 1: Account Health Analysis -->
+                <div id="tab-analysis" class="tab-content active" style="padding: 15px; box-sizing: border-box;">
+                    <!-- Status Banner -->
+                    <div id="statusBanner" class="status-banner"></div>
+
+                    <!-- Charts Layout -->
+                    <div class="health-grid" style="flex: 1 1 44%; min-height: 0;">
+                        <!-- Chart 1: Grouped Bar Chart -->
+                        <div class="card glass chart-card">
+                            <div class="card-header">📊 Aggregates per Account</div>
+                            <div class="chart-container">
+                                <canvas id="barChart"></canvas>
                             </div>
-                            <div class="control-group">
-                                <label class="text-small text-muted" for="dateTo">To:</label>
-                                <input type="date" class="form-control" id="dateTo">
-                            </div>
-                            <div class="control-group">
-                                <label class="text-small text-muted" for="accountFilter">Account:</label>
-                                <select class="form-control" id="accountFilter">
-                                    <option value="">All accounts</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="loadAllData()">Refresh</button>
                         </div>
-                        <div class="d-flex gap-10 align-center">
-                            <label class="text-small text-muted" for="clearDate">Older than:</label>
-                            <input type="date" class="form-control" id="clearDate">
-                            <button class="btn btn-danger" onclick="clearOldData()">Clear</button>
+
+                        <!-- Chart 2: Success Duration Line Chart -->
+                        <div class="card glass chart-card">
+                            <div class="card-header">📈 Success Cycle Durations</div>
+                            <div class="chart-container">
+                                <canvas id="lineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Event History Card -->
+                    <div class="card glass mb-15 p-15" id="eventHistoryCard" style="flex: 1 1 56%; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0;">
+                        <div class="d-flex justify-between align-center mb-15 pb-10" style="border-bottom: 1px solid var(--border);">
+                            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase;">📋 Event History</div>
+                            <div class="d-flex align-center gap-15">
+                                <div class="slider-container" id="sliderGroupTab1">
+                                    <span class="text-small text-muted">Show Last N Events:</span>
+                                    <input type="range" id="lastNEvents" min="10" max="200" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onTab1ChartSettingChange()">
+                                    <span class="slider-val" id="lastNEventsVal">100</span>
+                                </div>
+                                <div class="d-flex align-center gap-10" id="yScaleGroupTab1">
+                                    <span class="text-small text-muted">Y-Scale:</span>
+                                    <label class="d-flex align-center gap-4 text-small" style="cursor: pointer;">
+                                        <input type="radio" name="yScaleTab1" value="linear" checked onchange="onTab1ChartSettingChange()"> Linear
+                                    </label>
+                                    <label class="d-flex align-center gap-4 text-small" style="cursor: pointer;">
+                                        <input type="radio" name="yScaleTab1" value="logarithmic" onchange="onTab1ChartSettingChange()"> Logarithmic
+                                    </label>
+                                </div>
+                                <button class="btn" id="toggleViewBtnTab1" onclick="toggleChartViewTab1()">📋 Show Table</button>
+                            </div>
+                        </div>
+                        
+                        <div class="chart-container" id="chartViewContainerTab1" style="position: relative; flex: 1 1 auto; min-height: 0;">
+                            <canvas id="eventHistoryChart"></canvas>
+                        </div>
+                        
+                        <div class="table-scroll hidden" id="tableViewContainerTab1" style="flex: 1 1 auto; min-height: 0;">
+                            <table class="health-table">
+                                <thead>
+                                    <tr>
+                                        <th>Seq</th>
+                                        <th>Run</th>
+                                        <th>Account</th>
+                                        <th>Time</th>
+                                        <th>Duration</th>
+                                        <th>Filename</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="eventHistoryTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-muted text-center" style="text-align: center; padding: 20px;">No events recorded.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Charts Layout -->
-                <div class="health-grid">
-                    <!-- Chart 1: Grouped Bar Chart -->
-                    <div class="card glass chart-card">
-                        <div class="card-header">📊 Aggregates per Account</div>
-                        <div class="chart-container">
-                            <canvas id="barChart"></canvas>
+                <!-- Tab 2: Run Management -->
+                <div id="tab-management" class="tab-content" style="padding: 15px; box-sizing: border-box;">
+                    <!-- Controls Card -->
+                    <div class="card glass controls-card" style="flex-shrink: 0;">
+                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase; margin-bottom: 15px;">Data Filter & Maintenance - date range and account apply to the Account Health Analysis charts</div>
+                        <div class="controls-row d-flex-between">
+                            <div class="d-flex gap-15 align-center flex-wrap">
+                                <div class="control-group">
+                                    <label class="text-small text-muted" for="dateFrom">From:</label>
+                                    <input type="date" class="form-control" id="dateFrom" onchange="onFilterChange()">
+                                </div>
+                                <div class="control-group">
+                                    <label class="text-small text-muted" for="dateTo">To:</label>
+                                    <input type="date" class="form-control" id="dateTo" onchange="onFilterChange()">
+                                </div>
+                                <div class="control-group">
+                                    <label class="text-small text-muted" for="accountFilter">Account:</label>
+                                    <select class="form-control" id="accountFilter" onchange="onFilterChange()">
+                                        <option value="">All accounts</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary" onclick="onRefreshAll()">Refresh</button>
+                            </div>
+                            <div class="d-flex gap-10 align-center">
+                                <label class="text-small text-muted" for="clearDate">Older than:</label>
+                                <input type="date" class="form-control" id="clearDate">
+                                <button class="btn btn-danger" onclick="clearOldData()">Clear</button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Chart 2: Success Duration Line Chart -->
-                    <div class="card glass chart-card">
-                        <div class="card-header">📈 Success Cycle Durations</div>
-                        <div class="chart-container">
-                            <canvas id="lineChart"></canvas>
+                    <!-- Summary Statistics Grid -->
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-icon">🏃‍♂️</div>
+                            <div class="summary-info">
+                                <span class="stat-label">Total Runs</span>
+                                <span class="stat-val" id="summaryTotalRuns">0</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">✅</div>
+                            <div class="summary-info">
+                                <span class="stat-label">Successful Images</span>
+                                <span class="stat-val" id="summaryTotalImages">0</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">⚠️</div>
+                            <div class="summary-info">
+                                <span class="stat-label">AI Refusals</span>
+                                <span class="stat-val" id="summaryTotalRefusals">0</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon">🔌</div>
+                            <div class="summary-info">
+                                <span class="stat-label">Safety Resets</span>
+                                <span class="stat-val" id="summaryTotalResets">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Split Layout -->
+                    <div class="split-layout">
+                        <!-- Left Column: Runs Table List -->
+                        <div class="split-left">
+                            <div class="card glass mb-15 p-15" style="display: flex; flex-direction: column;">
+                                <div class="d-flex align-center justify-between mb-15" style="flex-shrink: 0;">
+                                    <div>
+                                        <h3 class="m-0" style="font-size: 14px; font-weight: 600;">Automation Runs List</h3>
+                                        <p class="text-muted text-small mb-0">Select a row to inspect its chronological timeline on the right.</p>
+                                    </div>
+                                    <button class="btn" onclick="fetchRunsTab(true)" title="Refresh Run Data">🔄 Refresh</button>
+                                </div>
+                                
+                                <div class="table-container interactive-table" id="tab2TableViewContainer" style="max-height: 480px; height: auto; margin-bottom: 0; overflow-y: auto;">
+                                    <table class="health-table" id="managementDataTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Run ID</th>
+                                                <th>Start Time</th>
+                                                <th>End Time</th>
+                                                <th>Accounts</th>
+                                                <th>Images</th>
+                                                <th>Refused</th>
+                                                <th>Reset</th>
+                                                <th>Quota</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="runsListTableBody">
+                                            <tr>
+                                                <td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Timeline Detail Panel -->
+                        <div class="split-right">
+                            <!-- Run Details card (hidden until row clicked) -->
+                            <div class="card glass p-15 hidden" id="runDetailCard" style="min-height: 540px; display: flex; flex-direction: column;">
+                                <div id="timelineDetailContent" class="d-flex flex-column" style="height: 100%; flex-grow: 1;">
+                                    <div class="d-flex align-center justify-between mb-15 pb-10" style="border-bottom: 1px solid var(--border);">
+                                        <div>
+                                            <h3 class="m-0" id="timelineTitle" style="font-size: 15px; font-weight: 600; word-break: break-all;">Run Details</h3>
+                                            <span id="timelineStatusBadge" class="status-badge mt-5" style="display: inline-block;">Completed</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Info cards using grid-2 -->
+                                    <div class="grid-2 gap-10 mb-15" style="flex-shrink: 0;">
+                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
+                                            <span class="text-muted text-small">Start Time</span>
+                                            <span class="text-small font-weight-500" id="timelineStartVal" style="font-family: var(--font-mono);">-</span>
+                                        </div>
+                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
+                                            <span class="text-muted text-small">Stop Time</span>
+                                            <span class="text-small font-weight-500" id="timelineStopVal" style="font-family: var(--font-mono);">-</span>
+                                        </div>
+                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
+                                            <span class="text-muted text-small">Duration</span>
+                                            <span class="text-small font-weight-500" id="timelineDurationVal">-</span>
+                                        </div>
+                                        <div class="card p-10 d-flex justify-between align-center" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border); margin-bottom: 0;">
+                                            <span class="text-muted text-small">Events</span>
+                                            <span class="text-small font-weight-500" id="timelineEventsVal">-</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Timeline container -->
+                                    <div style="flex-grow: 1; position: relative; min-height: 380px;">
+                                        <div class="timeline-wrapper" id="timelineNodesContainer" style="position: absolute; inset: 0; overflow-y: auto;">
+                                            <!-- Chronological nodes -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Placeholder to prompt user to select a run -->
+                            <div class="card glass p-15 d-flex align-center justify-center text-center text-muted" id="runDetailPlaceholder" style="min-height: 540px;">
+                                <div>
+                                    <div style="font-size: 32px; margin-bottom: 12px;">🏃‍♂️</div>
+                                    <div>Select an automation run from the list to view its detail timeline.</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Runs Card -->
-                <div class="card glass runs-card">
-                    <div class="card-header">🏃‍♂️ Recent Automation Runs</div>
-                    <div class="table-scroll">
-                        <table class="health-table">
-                            <thead>
-                                <tr>
-                                    <th>Run ID</th>
-                                    <th>Start Time</th>
-                                    <th>End Time</th>
-                                    <th>Accounts</th>
-                                    <th>Successes</th>
-                                    <th>Refusals</th>
-                                    <th>Resets</th>
-                                    <th>Quota Hits</th>
-                                </tr>
-                            </thead>
-                            <tbody id="runsTableBody">
-                                <tr>
-                                    <td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <!-- Tab 3: Run Performance Insights -->
+                <div id="tab-insights" class="tab-content" style="height: 100%; min-height: 0; padding: 15px; box-sizing: border-box; overflow: hidden;">
+                    <div class="health-grid" style="height: 100%; min-height: 0; display: flex; flex-direction: column;">
+                        <div class="d-flex flex-column" style="min-height: 0; height: 100%; flex-grow: 1;">
+                            
+                            <!-- Control Panel -->
+                            <div class="card glass mb-15 p-15" style="flex-shrink: 0;">
+                                <div class="d-flex align-center gap-15 justify-between">
+                                    <div class="d-flex align-center gap-15 flex-grow-1">
+                                        <div class="form-group mb-0" style="max-width: 250px; flex-grow: 1;">
+                                            <label class="form-label">Select Run</label>
+                                            <select class="form-control" id="tab3RunSelect" onchange="onTab3RunChange()"></select>
+                                        </div>
+                                        <div class="form-group mb-0" style="max-width: 220px; flex-grow: 1;">
+                                            <label class="form-label">Y-Axis Metric</label>
+                                            <div class="d-flex align-center gap-10" style="height: 38px;">
+                                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
+                                                    <input type="radio" name="tab3YAxis" value="Duration" checked onchange="onTab3YAxisChange()"> Duration
+                                                </label>
+                                                <label class="d-flex align-center gap-8 text-small" style="cursor: pointer; user-select: none;">
+                                                    <input type="radio" name="tab3YAxis" value="Images" onchange="onTab3YAxisChange()"> Images
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="form-group mb-0 flex-grow-1" id="tab3SliderGroup" style="max-width: 300px;">
+                                            <label class="form-label">Show Last N Accounts</label>
+                                            <div class="slider-container">
+                                                <input type="range" class="w-100" id="tab3NAccounts" min="1" max="10" step="1" value="10" oninput="updateTab3SliderVal(this.value)" onchange="onTab3SliderChange()">
+                                                <span class="slider-val" id="tab3NAccountsVal">10</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-center gap-10" style="margin-top: 15px;">
+                                        <button class="btn" onclick="fetchInsightsTab(true)" title="Refresh">🔄 Refresh</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Graph View Container -->
+                            <div class="chart-container flex-grow-1" id="tab3ChartViewContainer" style="min-height: 250px; display: flex; flex-direction: column;">
+                                <div style="flex-grow: 1; position: relative; min-height: 0;">
+                                    <canvas id="insightsChart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <!-- Table View Container -->
+                            <div class="table-container" id="tab3TableViewContainer" style="height: 220px; flex-shrink: 0; overflow-y: auto; margin-bottom: 0; margin-top: 15px;">
+                                <table class="health-table" id="insightsDataTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Seq</th>
+                                            <th>Account</th>
+                                            <th>Duration</th>
+                                            <th>Events</th>
+                                            <th>Images</th>
+                                            <th>Refused</th>
+                                            <th>Reset</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="insightsTableBody">
+                                        <!-- Table rows populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -224,6 +781,24 @@
     <script>
         let barChartInstance = null;
         let lineChartInstance = null;
+        let eventHistoryChartInstance = null;
+        let insightsChartInstance = null;
+
+        let tab1FilteredEvents = [];
+        let tab1SummaryCache = [];
+        let showTableModeTab1 = false;
+
+        let runsListCache = [];
+        let selectedRunId = null;
+        let isAutomationRunning = false;
+
+        let tab3RunsList = [];
+
+        let tabLoadedFlags = {
+            'tab-analysis': true,
+            'tab-management': false,
+            'tab-insights': false
+        };
 
         // Electron open folders helper
         async function triggerOpenDownloadFolder(event) {
@@ -274,13 +849,17 @@
         // Display status helper
         function showStatus(msg, type = 'error') {
             const banner = document.getElementById('statusBanner');
-            banner.textContent = msg;
-            banner.className = 'status-banner ' + type;
+            if (banner) {
+                banner.textContent = msg;
+                banner.className = 'status-banner ' + type;
+            }
         }
 
         function clearStatus() {
             const banner = document.getElementById('statusBanner');
-            banner.style.display = 'none';
+            if (banner) {
+                banner.style.display = 'none';
+            }
         }
 
         // Populate account filter select list dynamically
@@ -311,6 +890,15 @@
             });
         }
 
+        function onFilterChange() {
+            loadAllData();
+        }
+
+        async function onRefreshAll() {
+            await loadAllData();
+            await fetchRunsTab(true);
+        }
+
         // Main data loading function
         async function loadAllData() {
             clearStatus();
@@ -322,6 +910,7 @@
                 // 1. Fetch Aggregates/Summary for Chart 1 and Account Filter
                 const summaryResp = await api.getHealthSummary({ date_from: dateFrom, date_to: dateTo, group_by: 'account' });
                 const summaryData = summaryResp.summary || [];
+                tab1SummaryCache = summaryData;
                 updateAccountFilter(summaryData);
                 renderBarChart(summaryData);
 
@@ -334,10 +923,9 @@
                 const eventsData = eventsResp.events || [];
                 renderLineChart(eventsData);
 
-                // 3. Fetch Runs Table
-                const runsResp = await api.getHealthRuns(50);
-                const runsData = runsResp.runs || [];
-                renderRunsTable(runsData);
+                // 3. Render event history card
+                tab1FilteredEvents = eventsResp.events || [];
+                renderEventHistory();
 
             } catch (err) {
                 showStatus("Failed to load health statistics: " + err.message, 'error');
@@ -444,32 +1032,6 @@
             });
         }
 
-        // Render Runs Table
-        function renderRunsTable(runs) {
-            const tbody = document.getElementById('runsTableBody');
-            if (runs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = runs.map(run => {
-                const startStr = run.start_ts ? new Date(run.start_ts * 1000).toLocaleString() : 'N/A';
-                const endStr = run.end_ts ? new Date(run.end_ts * 1000).toLocaleString() : 'N/A';
-                return `
-                    <tr>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: #a0a0ff;">${run.run_id}</td>
-                        <td>${startStr}</td>
-                        <td>${endStr}</td>
-                        <td>${run.accounts || 0}</td>
-                        <td style="color: var(--success); font-weight: 500;">${run.successes || 0}</td>
-                        <td style="color: var(--warning);">${run.refusals || 0}</td>
-                        <td style="color: var(--danger);">${run.resets || 0}</td>
-                        <td style="color: hsl(263, 80%, 65%);">${run.quota_hits || 0}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
         // Clear health database entries helper
         async function clearOldData() {
             clearStatus();
@@ -488,14 +1050,1068 @@
                 const count = res.deleted || 0;
                 showStatus(`Successfully cleared ${count} old events.`, 'success');
                 loadAllData();
+                fetchRunsTab(true);
             } catch (err) {
                 showStatus("Failed to clear old data: " + err.message, 'error');
             }
         }
 
+        // ── Tab 1: Event History Implementation ──
+        function renderEventHistory() {
+            const slider = document.getElementById('lastNEvents');
+            const limit = parseInt(slider.value, 10) || 100;
+            const yScale = document.querySelector('input[name="yScaleTab1"]:checked').value;
+            
+            const validTypes = ['success', 'refused', 'reset', 'quota'];
+            const filtered = tab1FilteredEvents.filter(e => validTypes.includes(e.event_type));
+            
+            // Slice the most recent N events
+            const sliced = filtered.slice(0, limit);
+            
+            if (showTableModeTab1) {
+                document.getElementById('chartViewContainerTab1').classList.add('hidden');
+                document.getElementById('tableViewContainerTab1').classList.remove('hidden');
+                renderEventHistoryTable(sliced);
+            } else {
+                document.getElementById('chartViewContainerTab1').classList.remove('hidden');
+                document.getElementById('tableViewContainerTab1').classList.add('hidden');
+                renderEventHistoryChart(sliced, yScale);
+            }
+        }
+
+        function updateSliderVal(val) {
+            document.getElementById('lastNEventsVal').textContent = val;
+        }
+
+        function onTab1ChartSettingChange() {
+            renderEventHistory();
+        }
+
+        function toggleChartViewTab1() {
+            showTableModeTab1 = !showTableModeTab1;
+            const btn = document.getElementById('toggleViewBtnTab1');
+            const yScaleGroup = document.getElementById('yScaleGroupTab1');
+            
+            if (showTableModeTab1) {
+                btn.textContent = '📊 Plot Graph';
+                yScaleGroup.classList.add('hidden');
+            } else {
+                btn.textContent = '📋 Show Table';
+                yScaleGroup.classList.remove('hidden');
+            }
+            renderEventHistory();
+        }
+
+        function renderEventHistoryChart(slicedEvents, yScale) {
+            if (eventHistoryChartInstance) {
+                eventHistoryChartInstance.destroy();
+            }
+            
+            const ctx = document.getElementById('eventHistoryChart').getContext('2d');
+            
+            // Sort to chronological order (oldest to newest for plotting)
+            const data = [...slicedEvents].reverse();
+            
+            if (data.length === 0) {
+                return;
+            }
+            
+            // Find max duration of success events to compute stub height
+            let maxDuration = 1;
+            data.forEach(e => {
+                if (e.event_type === 'success' && e.duration_sec > maxDuration) {
+                    maxDuration = e.duration_sec;
+                }
+            });
+            
+            // Non-success events carry no duration; give them a visible stub bar so
+            // their status colour still reads. Log axes cannot plot <= 0.
+            const stubHeight = Math.max(1, maxDuration * 0.02);
+
+            const labels = data.map((e, index) => index + 1);
+            const yValues = data.map(e => {
+                const val = e.event_type === 'success' ? (e.duration_sec || 0) : stubHeight;
+                return (yScale === 'logarithmic' && val <= 0) ? 0.01 : val;
+            });
+            
+            const colorsMap = {
+                'success': '#2ecc71',
+                'refused': '#a0a0ff',
+                'reset': '#f39c12',
+                'quota': '#ff9999'
+            };
+            
+            const barColors = data.map(e => colorsMap[e.event_type] || '#7f8c8d');
+            
+            eventHistoryChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: yValues,
+                        backgroundColor: barColors,
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: (tooltipItems) => {
+                                    const index = tooltipItems[0].dataIndex;
+                                    const e = data[index];
+                                    return `Event: ${e.event_type.toUpperCase()}`;
+                                },
+                                label: (tooltipItem) => {
+                                    const index = tooltipItem.dataIndex;
+                                    const e = data[index];
+                                    const lines = [
+                                        `Account: ${e.account || 'N/A'}`,
+                                        `Time: ${new Date(e.ts * 1000).toLocaleString()}`
+                                    ];
+                                    if (e.event_type === 'success') {
+                                        lines.push(`Duration: ${e.duration_sec}s`);
+                                        if (e.filename) {
+                                            lines.push(`File: ${e.filename}`);
+                                        }
+                                    } else {
+                                        let extraObj = {};
+                                        if (e.extra) {
+                                            try { extraObj = typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra; } catch(err) {}
+                                        }
+                                        if (extraObj.text) {
+                                            lines.push(`Details: ${extraObj.text}`);
+                                        }
+                                    }
+                                    return lines;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
+                        },
+                        y: {
+                            type: yScale,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderEventHistoryTable(slicedEvents) {
+            const tbody = document.getElementById('eventHistoryTableBody');
+            tbody.innerHTML = '';
+            
+            if (slicedEvents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No events recorded.</td></tr>';
+                return;
+            }
+            
+            slicedEvents.forEach((e, idx) => {
+                const tr = document.createElement('tr');
+                
+                const seq = slicedEvents.length - idx;
+                const run = e.run_id || 'N/A';
+                const account = e.account || 'N/A';
+                const time = new Date(e.ts * 1000).toLocaleString();
+                const duration = e.event_type === 'success' ? `${e.duration_sec}s` : '—';
+                const filename = e.filename || '—';
+                
+                let statusClass = 'status-badge';
+                let statusText = e.event_type.toUpperCase();
+                if (e.event_type === 'success') {
+                    statusClass += ' status-success';
+                } else if (e.event_type === 'refused') {
+                    statusClass += ' status-refused';
+                } else if (e.event_type === 'reset') {
+                    statusClass += ' status-reset';
+                } else if (e.event_type === 'quota') {
+                    statusClass += ' status-fail';
+                }
+                
+                tr.innerHTML = `
+                    <td>${seq}</td>
+                    <td style="font-family: var(--font-mono); font-size: 12px; color: #a0a0ff;">${run}</td>
+                    <td style="font-weight: 500;">${account}</td>
+                    <td class="text-muted">${time}</td>
+                    <td>${duration}</td>
+                    <td style="font-family: var(--font-mono); font-size: 11px; word-break: break-all;">${filename}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── Tab 2: Run Management Implementation ──
+        async function fetchRunsTab(forceRefresh = false) {
+            try {
+                const [summaryResp, runsResp] = await Promise.all([
+                    api.getHealthSummary({}), 
+                    api.getHealthRuns(50)
+                ]);
+                
+                const summary = summaryResp.summary || [];
+                const runs = runsResp.runs || [];
+                runsListCache = runs;
+                
+                let totalImages = 0;
+                let totalRefusals = 0;
+                let totalResets = 0;
+                summary.forEach(s => {
+                    totalImages += s.successes || 0;
+                    totalRefusals += s.refusals || 0;
+                    totalResets += s.resets || 0;
+                });
+                
+                document.getElementById('summaryTotalRuns').textContent = runs.length;
+                document.getElementById('summaryTotalImages').textContent = totalImages;
+                document.getElementById('summaryTotalRefusals').textContent = totalRefusals;
+                document.getElementById('summaryTotalResets').textContent = totalResets;
+                
+                renderRunsListTable(runs);
+                
+                if (selectedRunId) {
+                    const stillExists = runs.some(r => r.run_id === selectedRunId);
+                    if (stillExists) {
+                        showRunDetail(selectedRunId);
+                    } else {
+                        hideRunDetail();
+                    }
+                } else {
+                    hideRunDetail();
+                }
+            } catch (err) {
+                console.error("Failed to load runs tab data:", err);
+            }
+        }
+
+        function renderRunsListTable(runs) {
+            const tbody = document.getElementById('runsListTableBody');
+            tbody.innerHTML = '';
+            
+            if (runs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-muted text-center" style="text-align: center; padding: 20px;">No runs recorded.</td></tr>';
+                return;
+            }
+            
+            runs.forEach(run => {
+                const tr = document.createElement('tr');
+                tr.className = 'run-row';
+                if (run.run_id === selectedRunId) {
+                    tr.classList.add('selected-row');
+                }
+                
+                tr.onclick = () => {
+                    document.querySelectorAll('#managementDataTable tbody tr').forEach(r => r.classList.remove('selected-row'));
+                    tr.classList.add('selected-row');
+                    showRunDetail(run.run_id);
+                };
+                
+                // run_id is a 'YYYYMMDD-HHMMSS' stamp — truncating it collapses every
+                // run from the same day into one indistinguishable label.
+                const runIdShort = run.run_id || 'N/A';
+                const startStr = run.start_ts ? new Date(run.start_ts * 1000).toLocaleString() : 'N/A';
+                const endStr = run.end_ts ? new Date(run.end_ts * 1000).toLocaleString() : 'N/A';
+                
+                tr.innerHTML = `
+                    <td style="font-family: var(--font-mono); font-size: 12px; color: #a0a0ff;">${runIdShort}</td>
+                    <td>${startStr}</td>
+                    <td>${endStr}</td>
+                    <td>${run.accounts || 0}</td>
+                    <td style="color: var(--success); font-weight: 500;">${run.successes || 0}</td>
+                    <td style="color: var(--warning);">${run.refusals || 0}</td>
+                    <td style="color: var(--danger);">${run.resets || 0}</td>
+                    <td style="color: hsl(263, 80%, 65%);">${run.quota_hits || 0}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function showRunDetail(runId) {
+            selectedRunId = runId;
+            
+            document.getElementById('runDetailCard').classList.remove('hidden');
+            document.getElementById('runDetailPlaceholder').classList.add('hidden');
+            
+            const run = runsListCache.find(r => r.run_id === runId);
+            
+            document.getElementById('timelineTitle').textContent = `Run ${runId}`;
+            
+            const container = document.getElementById('timelineNodesContainer');
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px;">⏳ Loading event timeline...</div>';
+            
+            try {
+                const eventsResp = await api.getHealthEvents({ run_id: runId, limit: 2000 });
+                const events = eventsResp.events || [];
+                
+                const hasEnd = events.some(e => e.event_type === 'run_end');
+                const badge = document.getElementById('timelineStatusBadge');
+                // run.end_ts is MAX(ts), not an end marker — it is set for every run,
+                // so only a run_end event proves completion.
+                const isNewestRun = runsListCache.length > 0 && runsListCache[0].run_id === runId;
+                const inProgress = !hasEnd && isAutomationRunning && isNewestRun;
+                if (hasEnd) {
+                    badge.textContent = 'Completed';
+                    badge.className = 'status-badge status-success';
+                } else if (inProgress) {
+                    badge.textContent = 'In Progress';
+                    badge.className = 'status-badge status-refused';
+                } else {
+                    badge.textContent = 'Interrupted';
+                    badge.className = 'status-badge status-reset';
+                }
+
+                const startTs = run ? run.start_ts : (events.length > 0 ? events[events.length - 1].ts : null);
+                // A still-running run has no stop time: run.end_ts would just be its
+                // latest event, which would read as if the run had already stopped.
+                const endTs = inProgress
+                    ? null
+                    : (run ? run.end_ts : (hasEnd ? events.find(e => e.event_type === 'run_end').ts : null));
+                
+                document.getElementById('timelineStartVal').textContent = startTs ? new Date(startTs * 1000).toLocaleString() : 'N/A';
+                document.getElementById('timelineStopVal').textContent = endTs ? new Date(endTs * 1000).toLocaleString() : 'N/A';
+                
+                let durationStr = 'N/A';
+                if (startTs && endTs) {
+                    const diffSec = endTs - startTs;
+                    durationStr = formatDuration(diffSec);
+                } else if (startTs) {
+                    const diffSec = Math.floor(Date.now() / 1000) - startTs;
+                    durationStr = formatDuration(diffSec) + ' (Active)';
+                }
+                document.getElementById('timelineDurationVal').textContent = durationStr;
+                document.getElementById('timelineEventsVal').textContent = events.length;
+                
+                const chronoEvents = [...events].reverse();
+                container.innerHTML = '';
+                
+                chronoEvents.forEach(e => {
+                    const node = document.createElement('div');
+                    let nodeClass = 'timeline-node';
+                    let headerText = '';
+                    let bodyText = '';
+                    
+                    let extraObj = {};
+                    if (e.extra) {
+                        try {
+                            extraObj = typeof e.extra === 'string' ? JSON.parse(e.extra) : e.extra;
+                        } catch(err) {
+                            extraObj = { text: String(e.extra) };
+                        }
+                    }
+                    
+                    const timeStr = new Date(e.ts * 1000).toLocaleTimeString();
+                    
+                    switch (e.event_type) {
+                        case 'run_start':
+                        case 'run_resume':
+                            nodeClass += ' node-start';
+                            headerText = e.event_type === 'run_start' ? 'Run started' : 'Run resumed';
+                            const mode = extraObj.mode || 'N/A';
+                            const goal = extraObj.goal || 'N/A';
+                            bodyText = `Mode: ${mode} | Goal: ${goal}`;
+                            break;
+                        case 'switch':
+                            nodeClass += ' node-switch';
+                            headerText = `Switched to ${e.account || 'Unknown'}`;
+                            const fromAcc = extraObj.from || 'N/A';
+                            const reason = extraObj.reason || 'N/A';
+                            bodyText = `From: ${fromAcc} | Reason: ${reason}`;
+                            break;
+                        case 'success':
+                            nodeClass += ' node-success';
+                            headerText = 'Image saved';
+                            const filename = e.filename || 'N/A';
+                            const duration = e.duration_sec ? `${e.duration_sec}s` : 'N/A';
+                            const cycleIdx = e.cycle_index !== undefined ? e.cycle_index : 'N/A';
+                            bodyText = `File: ${filename} (Duration: ${duration}, Cycle #${cycleIdx})`;
+                            break;
+                        case 'refused':
+                            nodeClass += ' node-refused';
+                            headerText = 'AI refused';
+                            bodyText = extraObj.text ? extraObj.text.substring(0, 100) : 'No reason provided';
+                            break;
+                        case 'reset':
+                        case 're_login':
+                            nodeClass += ' node-reset';
+                            headerText = e.event_type === 'reset' ? 'Safety reset' : 'Re-login';
+                            bodyText = extraObj.reason || extraObj.text || '';
+                            break;
+                        case 'quota':
+                            nodeClass += ' node-refused';
+                            headerText = 'Quota hit';
+                            bodyText = extraObj.text || 'Account hit quota limit.';
+                            break;
+                        case 'run_end':
+                            nodeClass += ' node-stop';
+                            headerText = 'Run ended';
+                            const successes = extraObj.successes || 0;
+                            const resets = extraObj.resets || 0;
+                            bodyText = `Totals: Successes: ${successes} | Resets: ${resets}`;
+                            break;
+                        default:
+                            nodeClass += '';
+                            headerText = e.event_type;
+                            bodyText = JSON.stringify(extraObj);
+                    }
+                    
+                    node.className = nodeClass;
+                    node.innerHTML = `
+                        <div class="node-time">${timeStr}</div>
+                        <div class="node-header">${headerText}</div>
+                        <div class="node-body">${bodyText}</div>
+                    `;
+                    container.appendChild(node);
+                });
+            } catch (err) {
+                console.error("Failed to load run timeline:", err);
+                container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 11px;">⚠️ Failed to load timeline detail: ${err.message}</div>`;
+            }
+        }
+
+        function hideRunDetail() {
+            selectedRunId = null;
+            document.getElementById('runDetailCard').classList.add('hidden');
+            document.getElementById('runDetailPlaceholder').classList.remove('hidden');
+        }
+
+        // ── Tab 3: Run Performance Insights Implementation ──
+        async function fetchInsightsTab(forceRefresh = false) {
+            try {
+                const runsResp = await api.getHealthRuns(50);
+                tab3RunsList = runsResp.runs || [];
+                
+                populateInsightsRunsSelect();
+            } catch (err) {
+                console.error("Failed to load insights runs:", err);
+            }
+        }
+
+        function populateInsightsRunsSelect() {
+            const select = document.getElementById('tab3RunSelect');
+            if (!select) return;
+            const prevVal = select.value;
+            select.innerHTML = '';
+            
+            if (tab3RunsList.length === 0) {
+                select.innerHTML = '<option value="">No runs recorded</option>';
+                return;
+            }
+            
+            tab3RunsList.forEach(run => {
+                const startStr = run.start_ts ? new Date(run.start_ts * 1000).toLocaleString() : 'Unknown';
+                const opt = document.createElement('option');
+                opt.value = run.run_id;
+                opt.textContent = `${startStr} (Run: ${run.run_id || 'N/A'})`;
+                select.appendChild(opt);
+            });
+            
+            if (prevVal && tab3RunsList.some(r => r.run_id === prevVal)) {
+                select.value = prevVal;
+            } else {
+                select.selectedIndex = 0;
+            }
+            
+            onTab3RunChange();
+        }
+
+        async function onTab3RunChange() {
+            const select = document.getElementById('tab3RunSelect');
+            const runId = select.value;
+            if (!runId) return;
+            
+            try {
+                const eventsResp = await api.getHealthEvents({ run_id: runId, limit: 2000 });
+                const events = eventsResp.events || [];
+                
+                const chronoEvents = [...events].reverse();
+                
+                const accountsMap = new Map();
+                const accountsOrder = [];
+                
+                chronoEvents.forEach(e => {
+                    const acc = e.account || 'Unknown';
+                    if (!accountsMap.has(acc)) {
+                        accountsMap.set(acc, {
+                            account: acc,
+                            duration_sec: 0,
+                            eventsCount: 0,
+                            successCount: 0,
+                            refusedCount: 0,
+                            resetCount: 0
+                        });
+                        accountsOrder.push(acc);
+                    }
+                    
+                    const stats = accountsMap.get(acc);
+                    stats.eventsCount++;
+                    
+                    if (e.event_type === 'success') {
+                        stats.successCount++;
+                        stats.duration_sec += e.duration_sec || 0;
+                    } else if (e.event_type === 'refused') {
+                        stats.refusedCount++;
+                    } else if (e.event_type === 'reset' || e.event_type === 're_login') {
+                        stats.resetCount++;
+                    } else if (e.event_type === 'quota') {
+                        stats.refusedCount++;
+                    }
+                });
+                
+                const groupedStats = accountsOrder.map(acc => accountsMap.get(acc));
+                
+                const slider = document.getElementById('tab3NAccounts');
+                const numAccounts = groupedStats.length;
+                slider.max = Math.max(10, numAccounts);
+                slider.min = 1;
+                
+                if (numAccounts > 0 && parseInt(slider.value) > numAccounts) {
+                    slider.value = numAccounts;
+                    document.getElementById('tab3NAccountsVal').textContent = numAccounts;
+                }
+                
+                renderInsights(groupedStats);
+            } catch (err) {
+                console.error("Failed to load run details for insights:", err);
+            }
+        }
+
+        function updateTab3SliderVal(val) {
+            document.getElementById('tab3NAccountsVal').textContent = val;
+        }
+
+        function onTab3SliderChange() {
+            onTab3RunChange();
+        }
+
+        function onTab3YAxisChange() {
+            onTab3RunChange();
+        }
+
+        function renderInsights(groupedStats) {
+            const slider = document.getElementById('tab3NAccounts');
+            const limit = parseInt(slider.value, 10) || 10;
+            
+            const sliced = groupedStats.slice(-limit);
+            
+            renderInsightsChart(sliced);
+            renderInsightsTable(sliced);
+        }
+
+        function renderInsightsChart(slicedStats) {
+            if (insightsChartInstance) {
+                insightsChartInstance.destroy();
+            }
+            
+            const ctx = document.getElementById('insightsChart').getContext('2d');
+            if (slicedStats.length === 0) return;
+            
+            const yAxisChoice = document.querySelector('input[name="tab3YAxis"]:checked').value;
+            
+            let useMinutes = false;
+            if (yAxisChoice === 'Duration') {
+                const maxDur = Math.max(...slicedStats.map(s => s.duration_sec));
+                if (maxDur > 60) {
+                    useMinutes = true;
+                }
+            }
+            
+            const labels = slicedStats.map(s => s.account);
+            const dataPoints = slicedStats.map(s => {
+                if (yAxisChoice === 'Images') {
+                    return s.successCount;
+                } else {
+                    return useMinutes ? s.duration_sec / 60 : s.duration_sec;
+                }
+            });
+            
+            const barColor = yAxisChoice === 'Images' ? '#2ecc71' : '#4f8bf9';
+            const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8892b0';
+            
+            insightsChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataPoints,
+                        backgroundColor: barColor,
+                        borderWidth: 0,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (tooltipItem) => {
+                                    const s = slicedStats[tooltipItem.dataIndex];
+                                    return [
+                                        `Account: ${s.account}`,
+                                        `Duration: ${formatDuration(s.duration_sec)}`,
+                                        `Events: ${s.eventsCount}`,
+                                        `Images: ${s.successCount}`,
+                                        `Refused: ${s.refusedCount}`,
+                                        `Resets: ${s.resetCount}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
+                            ticks: { color: textMuted, font: { family: 'Google Sans, sans-serif' } }
+                        },
+                        y: {
+                            border: { display: true, color: 'rgba(255, 255, 255, 0.15)' },
+                            title: {
+                                display: true,
+                                text: yAxisChoice === 'Images' ? 'Images' : (useMinutes ? 'Duration (min)' : 'Duration (sec)'),
+                                color: textMuted
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: textMuted, font: { family: 'Google Sans, sans-serif' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderInsightsTable(slicedStats) {
+            const tbody = document.getElementById('insightsTableBody');
+            tbody.innerHTML = '';
+            
+            if (slicedStats.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;" class="text-muted">No records found.</td></tr>';
+                return;
+            }
+            
+            slicedStats.forEach((s, idx) => {
+                const tr = document.createElement('tr');
+                
+                const seq = idx + 1;
+                const durationStr = formatDuration(s.duration_sec);
+                
+                tr.innerHTML = `
+                    <td>${seq}</td>
+                    <td style="font-weight: 600; color: var(--text-main);">${s.account}</td>
+                    <td>${durationStr}</td>
+                    <td>${s.eventsCount}</td>
+                    <td style="color: #2ecc71; font-weight: 500;">${s.successCount}</td>
+                    <td style="color: #a0a0ff;">${s.refusedCount}</td>
+                    <td style="color: #f39c12;">${s.resetCount}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function formatDuration(x) {
+            const h = Math.floor(x / 3600);
+            const m = Math.floor((x % 3600) / 60);
+            const s = Math.floor(x % 60);
+            if (h > 0) {
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            } else if (m > 0) {
+                return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            } else {
+                return `${String(s).padStart(2, '0')}s`;
+            }
+        }
+
+        // ── Tabs Switching ──
+        // Tab 1's chart boxes are flex-sized, so they change with the window. Chart.js
+        // takes its size from the container when the chart is CREATED and does not
+        // follow later container changes here, so a resize must redraw them: too small
+        // a canvas leaves dead space, too large a one is clipped by the tab.
+        let tab1ChartsStale = false;
+        let _tab1ResizeTimer = null;
+
+        function renderTab1Charts() {
+            if (tab1SummaryCache.length) renderBarChart(tab1SummaryCache);
+            if (tab1FilteredEvents.length) renderLineChart(tab1FilteredEvents);
+            renderEventHistory();
+            tab1ChartsStale = false;
+        }
+
+        window.addEventListener('resize', () => {
+            clearTimeout(_tab1ResizeTimer);
+            _tab1ResizeTimer = setTimeout(() => {
+                // Redrawing while hidden would size the charts against a zero-height
+                // box, so defer to the next time this tab is shown.
+                if (document.getElementById('tab-analysis').classList.contains('active')) {
+                    renderTab1Charts();
+                } else {
+                    tab1ChartsStale = true;
+                }
+            }, 200);
+        });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const activeContent = document.getElementById(tabId);
+            if (activeContent) activeContent.classList.add('active');
+
+            const panel = document.getElementById('accountSidePanel');
+            if (panel) {
+                panel.classList.toggle('hidden', tabId !== 'tab-analysis');
+            }
+
+            if (tabId === 'tab-analysis') {
+                // A resize that happened while this tab was hidden left its charts
+                // sized for the old viewport — redraw them now that it has a box.
+                if (tab1ChartsStale) renderTab1Charts();
+            } else if (tabId === 'tab-management') {
+                if (!tabLoadedFlags['tab-management']) {
+                    fetchRunsTab();
+                    tabLoadedFlags['tab-management'] = true;
+                }
+            } else if (tabId === 'tab-insights') {
+                if (!tabLoadedFlags['tab-insights']) {
+                    fetchInsightsTab();
+                    tabLoadedFlags['tab-insights'] = true;
+                }
+            }
+        }
+
+        // ── Sidebar Account Status Panel ──
+        async function updateAccountStatusPanel() {
+            try {
+                const [config, statusResp] = await Promise.all([
+                    api.getConfig().catch(() => ({})),
+                    api.getProfilesStatus().catch(() => ({ profiles: [] }))
+                ]);
+                const profiles = statusResp.profiles || [];
+                const activeProfile = config.active_profile;
+                const activeUser = config.active_user;
+                const container = document.getElementById('accountStatusList');
+                if (!container) return;
+                
+                container.innerHTML = '';
+                if (profiles.length === 0) {
+                    container.innerHTML = '<span style="font-size:11px; color:var(--text-muted);">No profiles found</span>';
+                    return;
+                }
+                
+                const hasActiveProfileMatch = profiles.some(p => p.dir === activeProfile);
+                
+                profiles.forEach(p => {
+                    const dir = p.dir || '';
+                    const email = p.email || '';
+                    const name = p.name || '';
+                    const isActive = hasActiveProfileMatch ? (dir === activeProfile) : (email === activeUser);
+                    
+                    const card = document.createElement('div');
+                    card.className = 'account-card' + (isActive ? ' is-active' : '');
+                    
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'acct-name';
+                    nameEl.textContent = email || name || dir;
+                    card.appendChild(nameEl);
+                    
+                    const metaEl = document.createElement('div');
+                    metaEl.className = 'acct-meta';
+                    metaEl.textContent = isActive ? 'ACTIVE' : name || dir;
+                    card.appendChild(metaEl);
+                    
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                console.error("Failed to update account status panel:", err);
+            }
+        }
+
+        // ── Live Top Status Header ──
+        function restoreStatusCardsCache() {
+            try {
+                const cacheStr = sessionStorage.getItem('status_cards_cache');
+                if (!cacheStr) return;
+                const cache = JSON.parse(cacheStr);
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText && cache.engineStatus) {
+                    engineStatusText.textContent = cache.engineStatus.text;
+                    engineStatusText.className = cache.engineStatus.class;
+                    if (cache.engineStatus.bg !== undefined) engineStatusText.style.background = cache.engineStatus.bg;
+                    if (cache.engineStatus.color !== undefined) engineStatusText.style.color = cache.engineStatus.color;
+                    if (cache.engineStatus.border !== undefined) engineStatusText.style.border = cache.engineStatus.border;
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText && cache.browserStatus) {
+                    browserStatusText.textContent = cache.browserStatus.text;
+                    browserStatusText.className = cache.browserStatus.class;
+                    if (cache.browserStatus.bg !== undefined) browserStatusText.style.background = cache.browserStatus.bg;
+                    if (cache.browserStatus.color !== undefined) browserStatusText.style.color = cache.browserStatus.color;
+                    if (cache.browserStatus.border !== undefined) browserStatusText.style.border = cache.browserStatus.border;
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText && cache.browserAccount) {
+                    browserAccountText.innerHTML = cache.browserAccount.html;
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge && cache.autoStatus) {
+                    autoStatusBadge.innerHTML = cache.autoStatus.text;
+                    autoStatusBadge.className = cache.autoStatus.class;
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el && cache.stats && cache.stats[key] !== undefined) {
+                        el.textContent = cache.stats[key];
+                    }
+                }
+            } catch (e) {
+                console.error('Error restoring status cards cache:', e);
+            }
+        }
+
+        function saveStatusCardsCache() {
+            try {
+                const cache = {
+                    engineStatus: {},
+                    browserStatus: {},
+                    browserAccount: {},
+                    autoStatus: {},
+                    stats: {}
+                };
+                
+                const engineStatusText = document.getElementById('engineStatusText');
+                if (engineStatusText) {
+                    cache.engineStatus = {
+                        text: engineStatusText.textContent,
+                        class: engineStatusText.className,
+                        bg: engineStatusText.style.background || '',
+                        color: engineStatusText.style.color || '',
+                        border: engineStatusText.style.border || ''
+                    };
+                }
+                
+                const browserStatusText = document.getElementById('browserStatusText');
+                if (browserStatusText) {
+                    cache.browserStatus = {
+                        text: browserStatusText.textContent,
+                        class: browserStatusText.className,
+                        bg: browserStatusText.style.background || '',
+                        color: browserStatusText.style.color || '',
+                        border: browserStatusText.style.border || ''
+                    };
+                }
+                
+                const browserAccountText = document.getElementById('browserAccountText');
+                if (browserAccountText) {
+                    cache.browserAccount = {
+                        html: browserAccountText.innerHTML
+                    };
+                }
+                
+                const autoStatusBadge = document.getElementById('autoStatusBadge');
+                if (autoStatusBadge) {
+                    cache.autoStatus = {
+                        text: autoStatusBadge.innerHTML,
+                        class: autoStatusBadge.className
+                    };
+                }
+                
+                const fields = {
+                    'statCycles': 'cycles',
+                    'statImages': 'images',
+                    'statRefused': 'refused',
+                    'statResets': 'resets'
+                };
+                for (const [id, key] of Object.entries(fields)) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        cache.stats[key] = el.textContent;
+                    }
+                }
+                
+                sessionStorage.setItem('status_cards_cache', JSON.stringify(cache));
+            } catch (e) {
+                console.error('Error saving status cards cache:', e);
+            }
+        }
+
+        async function updateStatusHeader() {
+            try {
+                let isServiceRunning = false;
+                try {
+                    const svcStatus = await window.electronAPI.getEngineServiceStatus();
+                    isServiceRunning = svcStatus.running;
+                } catch (err) {
+                    console.error("Failed to get engine service status:", err);
+                }
+                
+                let isBrowserRunning = false;
+                if (isServiceRunning) {
+                    try {
+                        const bStatus = await api.getBrowserStatus();
+                        isBrowserRunning = !!(bStatus && bStatus.engine_running);
+                    } catch (err) {
+                        isServiceRunning = false;
+                    }
+                }
+                
+                const engineText = document.getElementById('engineStatusText');
+                const browserText = document.getElementById('browserStatusText');
+                const accountText = document.getElementById('browserAccountText');
+                
+                let changed = false;
+                
+                if (isServiceRunning) {
+                    changed |= updateElementState(engineText, 'ENGINE ON', 'job-status-badge conn-badge-connected', 'rgba(46, 204, 113, 0.15)', '#2ecc71', '1px solid rgba(46, 204, 113, 0.3)');
+                } else {
+                    changed |= updateElementState(engineText, 'ENGINE OFF', 'job-status-badge conn-badge-disconnected', 'rgba(255, 255, 255, 0.05)', 'var(--text-muted)', '1px solid var(--border)');
+                }
+                
+                if (isBrowserRunning) {
+                    changed |= updateElementState(browserText, 'BROWSER ONLINE', 'job-status-badge conn-badge-connected', 'rgba(46, 204, 113, 0.15)', '#2ecc71', '1px solid rgba(46, 204, 113, 0.3)');
+                } else {
+                    changed |= updateElementState(browserText, 'BROWSER OFFLINE', 'job-status-badge conn-badge-disconnected', 'rgba(255, 255, 255, 0.05)', 'var(--text-muted)', '1px solid var(--border)');
+                }
+                
+                if (isServiceRunning && isBrowserRunning) {
+                    try {
+                        const acc = await api.getAccountInfo();
+                        const rawAccId = acc.account_id || acc.status || 'Active';
+                        const cleanedAccId = rawAccId.replace(/@gmail\.com$/i, '');
+                        changed |= updateElementHTML(accountText, `<span class="text-accent font-weight-600">${cleanedAccId}</span>`);
+                    } catch(e) {
+                        if (!accountText || !accountText.textContent || accountText.textContent.trim() === 'Not Ready' || accountText.textContent.trim() === 'Scanning...') {
+                            changed |= updateElementHTML(accountText, `<span class="text-muted">Scanning...</span>`);
+                        }
+                    }
+                } else {
+                    changed |= updateElementHTML(accountText, `<span class="text-muted">Not Ready</span>`);
+                }
+                
+                try {
+                    const stats = await api.getAutomationStats();
+                    const autoBadge = document.getElementById('autoStatusBadge');
+                    
+                    if (stats) {
+                        // Cached for Tab 2's run badge; the conductor does not expose the
+                        // live run_id, so "in progress" = automation running + newest run.
+                        isAutomationRunning = !!stats.is_running;
+
+                        if (stats.is_running) {
+                            changed |= updateElementState(autoBadge, 'RUNNING', 'job-status-badge conn-badge-connected');
+                        } else if (stats.cycles > 0) {
+                            changed |= updateElementState(autoBadge, 'IDLE / FINISHED', 'job-status-badge conn-badge-disconnected');
+                        } else {
+                            changed |= updateElementState(autoBadge, 'STANDBY', 'job-status-badge conn-badge-disconnected');
+                        }
+                        
+                        changed |= updateElementText(document.getElementById('statCycles'), stats.cycles || 0);
+                        changed |= updateElementText(document.getElementById('statImages'), stats.successes || 0);
+                        changed |= updateElementText(document.getElementById('statRefused'), stats.refusals || 0);
+                        changed |= updateElementText(document.getElementById('statResets'), stats.resets || 0);
+                    } else {
+                        if (autoBadge) {
+                            changed |= updateElementState(autoBadge, 'OFFLINE', 'job-status-badge conn-badge-disconnected');
+                        }
+                    }
+                } catch (statsErr) {
+                    console.error("Failed to load automation stats:", statsErr);
+                    const autoBadge = document.getElementById('autoStatusBadge');
+                    if (autoBadge) {
+                        changed |= updateElementState(autoBadge, 'OFFLINE', 'job-status-badge conn-badge-disconnected');
+                    }
+                }
+                
+                if (changed) {
+                    saveStatusCardsCache();
+                }
+                
+                await updateAccountStatusPanel();
+            } catch (err) {
+                console.error("Error updating status headers:", err);
+            }
+        }
+
+        function updateElementState(el, text, className, bg = null, color = null, border = null) {
+            if (!el) return false;
+            let changed = false;
+            if (el.textContent !== text) {
+                el.textContent = text;
+                changed = true;
+            }
+            if (el.className !== className) {
+                el.className = className;
+                changed = true;
+            }
+            if (bg !== null) {
+                if (el.style.background !== bg) {
+                    el.style.background = bg;
+                    changed = true;
+                }
+            }
+            if (color !== null) {
+                if (el.style.color !== color) {
+                    el.style.color = color;
+                    changed = true;
+                }
+            }
+            if (border !== null) {
+                if (el.style.border !== border) {
+                    el.style.border = border;
+                    changed = true;
+                }
+            }
+            return changed;
+        }
+
+        function updateElementText(el, text) {
+            if (!el) return false;
+            const str = String(text);
+            if (el.textContent !== str) {
+                el.textContent = str;
+                return true;
+            }
+            return false;
+        }
+
+        function updateElementHTML(el, html) {
+            if (!el) return false;
+            if (el.innerHTML !== html) {
+                el.innerHTML = html;
+                return true;
+            }
+            return false;
+        }
+
         // Run on page load
         document.addEventListener('DOMContentLoaded', () => {
             initDateInputs();
+            restoreStatusCardsCache();
+            updateStatusHeader();
+            setInterval(updateStatusHeader, 3000);
             loadAllData();
         });
     </script>
