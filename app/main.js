@@ -315,6 +315,12 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  // Disable Ctrl+wheel / pinch page zoom — accidental zoom over a chart
+  // shoves the fixed header/tabs off-screen with no way to scroll back.
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.setVisualZoomLevelLimits(1, 1);
+  });
+
   // Intercept minimize → send to tray instead (only if from minimize button click)
   mainWindow.on('minimize', (event) => {
     const { screen } = require('electron');
