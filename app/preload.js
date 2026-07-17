@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (options) => ipcRenderer.invoke('save-file', options),
   openFile: (filePath) => ipcRenderer.invoke('open-file', filePath),
   showItemInFolder: (filePath) => ipcRenderer.invoke('show-item-in-folder', filePath),
+  ensureDirectory: (dirPath) => ipcRenderer.invoke('ensure-directory', dirPath),
   readImageBase64: (filePath) => ipcRenderer.invoke('read-image-base64', filePath),
   readPngMetadata: (filePath) => ipcRenderer.invoke('read-png-metadata', filePath),
 

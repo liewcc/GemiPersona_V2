@@ -113,6 +113,17 @@ ipcMain.handle('open-file', async (event, filePath) => {
   return '';
 });
 
+// Create `dirPath` (and any missing parents) if it isn't there yet.
+// `created` holds the topmost directory actually created, null if it already existed.
+ipcMain.handle('ensure-directory', async (event, dirPath) => {
+  try {
+    const created = await fs.promises.mkdir(dirPath, { recursive: true });
+    return { created: created || null };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
 ipcMain.handle('show-item-in-folder', async (event, filePath) => {
   shell.showItemInFolder(filePath);
 });
