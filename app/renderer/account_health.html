@@ -435,7 +435,7 @@
                             <div class="d-flex align-center gap-15">
                                 <div class="slider-container" id="sliderGroupTab1">
                                     <span class="text-small text-muted">Show Last N Events:</span>
-                                    <input type="range" id="lastNEvents" min="10" max="1000" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onTab1ChartSettingChange()">
+                                    <input type="range" id="lastNEvents" min="10" max="2000" step="10" value="100" oninput="updateSliderVal(this.value)" onchange="onTab1ChartSettingChange()">
                                     <span class="slider-val" id="lastNEventsVal">100</span>
                                 </div>
                                 <div class="d-flex align-center gap-10" id="yScaleGroupTab1">
@@ -859,7 +859,28 @@
             document.getElementById('lastNEventsVal').textContent = val;
         }
 
+        // Persisted across reloads so the chart doesn't reset to the default
+        // window every time the page is opened.
+        const LAST_N_EVENTS_KEY = 'accountHealth_lastNEvents';
+        const Y_SCALE_TAB1_KEY = 'accountHealth_yScaleTab1';
+
+        function restoreTab1ChartSettings() {
+            const savedN = localStorage.getItem(LAST_N_EVENTS_KEY);
+            if (savedN) {
+                const slider = document.getElementById('lastNEvents');
+                slider.value = savedN;
+                updateSliderVal(savedN);
+            }
+            const savedScale = localStorage.getItem(Y_SCALE_TAB1_KEY);
+            if (savedScale) {
+                const radio = document.querySelector(`input[name="yScaleTab1"][value="${savedScale}"]`);
+                if (radio) radio.checked = true;
+            }
+        }
+
         function onTab1ChartSettingChange() {
+            localStorage.setItem(LAST_N_EVENTS_KEY, document.getElementById('lastNEvents').value);
+            localStorage.setItem(Y_SCALE_TAB1_KEY, document.querySelector('input[name="yScaleTab1"]:checked').value);
             renderEventHistory();
         }
 
@@ -1898,6 +1919,7 @@
         // Run on page load
         document.addEventListener('DOMContentLoaded', () => {
             restoreStatusCardsCache();
+            restoreTab1ChartSettings();
             updateStatusHeader();
             setInterval(updateStatusHeader, 3000);
             loadAllData();
