@@ -47,6 +47,25 @@ CONFIG_PATH = os.path.join(BASE_DIR, "engine_config.json")
 ENGINE_VENV_PYTHON = os.path.join(BASE_DIR, ".python_venv", "pythonw.exe")
 ENGINE_SCRIPT = "engine_service.py"
 ENGINE_OUT = os.path.join(BASE_DIR, "engine_svc.out")
+MAX_LOG_BYTES = 5 * 1024 * 1024
+
+def rotate_if_oversized(path):
+    """Keep one generation of `path` and start fresh once it passes MAX_LOG_BYTES.
+
+    ponytail: the size is only checked when we are about to spawn an engine, so an
+    engine that stays up for weeks can still overshoot the cap. Upgrade path: pipe
+    the subprocess output through a RotatingFileHandler instead of handing it a raw
+    file handle.
+    """
+    try:
+        if os.path.getsize(path) < MAX_LOG_BYTES:
+            return
+        os.replace(path, path + ".1")
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        # A stale handle on the old file loses us the rotation, not the log line.
+        logger.error(f"Failed to rotate {path}: {e}")
 
 def get_engine_port():
     try:
@@ -138,13 +157,17 @@ async def ensure_service():
 
         logger.info("Engine unreachable. Spawning new engine process...")
         try:
-            out_file = open(ENGINE_OUT, "a")
-            subprocess.Popen(
-                [ENGINE_VENV_PYTHON, ENGINE_SCRIPT],
-                cwd=ENGINE_DIR,
-                stdout=out_file,
-                stderr=out_file
-            )
+            rotate_if_oversized(ENGINE_OUT)
+            # Popen duplicates the handle into the child, so closing our copy here
+            # keeps the conductor from leaking one fd per spawn — and leaving that
+            # fd open would also block the next rotation on Windows.
+            with open(ENGINE_OUT, "a") as out_file:
+                subprocess.Popen(
+                    [ENGINE_VENV_PYTHON, ENGINE_SCRIPT],
+                    cwd=ENGINE_DIR,
+                    stdout=out_file,
+                    stderr=out_file
+                )
         except Exception as e:
             logger.error(f"Failed to spawn engine: {e}")
             return False

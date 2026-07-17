@@ -14,13 +14,13 @@ node_modules/
 .node_venv/
 .node_temp/
 node-portable.zip
-conductor_ui.log
+conductor_ui.log*
 browser_user_data/
 browser_session_sandbox/
 
 # Local test artifacts
 test_downloads/
-engine_svc.out
+engine_svc.out*
 conductor/conductor.log*
 conductor/__pycache__/
 HANDOFF.md

@@ -182,6 +182,32 @@ def main():
 
     print("[OK] Time threshold reset-on-success and strict-timeout checks passed")
 
+    # Engine-log rotation
+    print("Testing engine_svc.out rotation...")
+    import tempfile
+    from server import rotate_if_oversized, MAX_LOG_BYTES
+    with tempfile.TemporaryDirectory() as _tmp:
+        _p = os.path.join(_tmp, "engine_svc.out")
+        rotate_if_oversized(_p)   # a missing log must be a no-op, not a crash
+        with open(_p, "wb") as f:
+            f.write(b"x" * 16)
+        rotate_if_oversized(_p)
+        assert os.path.exists(_p) and not os.path.exists(_p + ".1"), (
+            "a log under MAX_LOG_BYTES must be left alone"
+        )
+        with open(_p, "wb") as f:
+            f.write(b"x" * MAX_LOG_BYTES)
+        rotate_if_oversized(_p)
+        assert not os.path.exists(_p), "an oversized log must be moved aside"
+        assert os.path.getsize(_p + ".1") == MAX_LOG_BYTES, "rotated content was lost"
+        with open(_p, "wb") as f:
+            f.write(b"y" * MAX_LOG_BYTES)
+        rotate_if_oversized(_p)
+        assert not os.path.exists(_p) and os.path.getsize(_p + ".1") == MAX_LOG_BYTES, (
+            "rotating a second time must replace the previous generation, not fail"
+        )
+    print("[OK] engine_svc.out rotation passed")
+
     print("[OK] All selfchecks passed!")
 
 if __name__ == "__main__":

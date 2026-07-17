@@ -11,6 +11,20 @@ let tray = null;
 // V2 layout: config.json lives at project root; the conductor writes its own
 // conductor.log via RotatingFileHandler — this file only captures piped stdout.
 const ENGINE_LOG_PATH = path.join(__dirname, '..', 'conductor_ui.log');
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+// Keep one generation of logPath and start fresh once it passes MAX_LOG_BYTES.
+// ponytail: the size is only checked when we open the stream, so a session left
+// running for weeks can still overshoot the cap. Upgrade path: re-check from the
+// stdout 'data' handler below and reopen the stream mid-run.
+function rotateIfOversized(logPath) {
+  try {
+    if (fs.statSync(logPath).size < MAX_LOG_BYTES) return;
+    fs.renameSync(logPath, logPath + '.1');   // replaces any previous .1
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.error('Failed to rotate', logPath, e);
+  }
+}
 const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
 // V2 engine derives profiles from Local State; no login_lookup file. This path
 // backs only the offline IPC fallback (rarely fires — conductor auto-spawns engine).
@@ -370,6 +384,7 @@ function startEngine() {
   // Open log file for appending conductor output
   let logStream;
   try {
+    rotateIfOversized(ENGINE_LOG_PATH);
     logStream = fs.createWriteStream(ENGINE_LOG_PATH, { flags: 'a' });
   } catch (e) {
     console.error('Cannot open conductor log file:', e);
