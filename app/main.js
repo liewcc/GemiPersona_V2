@@ -796,6 +796,7 @@ async function performBackup(destRoot, isSafetyCopy = false) {
   
   await copyTarget('config.json', 'config.json');
   await copyTarget('engine_config.json', 'engine_config.json');
+  await copyTarget('data', 'data');
   
   const conductorDataSrc = path.join(rootDir, 'conductor', 'data');
   if (fs.existsSync(conductorDataSrc)) {
@@ -851,6 +852,8 @@ async function performBackup(destRoot, isSafetyCopy = false) {
 // ponytail: no chrome.exe process detection - we let the copy fail on a locked file and tell the
 // user to close the browser. Ceiling: a race where Chrome opens mid-copy yields a half-written
 // backup. Upgrade path: check for the SingletonLock / lockfile in browser_user_data before starting.
+// health.db is copied as a plain file, so a conductor write mid-copy can tear it; upgrade path
+// is sqlite3 VACUUM INTO (needs a sqlite dep, hence not now).
 ipcMain.handle('backup-settings', async (event, destRoot) => {
   try {
     const result = await performBackup(destRoot, false);
@@ -866,6 +869,8 @@ ipcMain.handle('backup-settings', async (event, destRoot) => {
 // ponytail: no chrome.exe process detection - we let the copy fail on a locked file and tell the
 // user to close the browser. Ceiling: a race where Chrome opens mid-copy yields a half-written
 // backup. Upgrade path: check for the SingletonLock / lockfile in browser_user_data before starting.
+// health.db is copied as a plain file, so a conductor write mid-copy can tear it; upgrade path
+// is sqlite3 VACUUM INTO (needs a sqlite dep, hence not now).
 ipcMain.handle('restore-settings', async (event, srcDir) => {
   try {
     if (!fs.existsSync(srcDir)) {
@@ -914,6 +919,7 @@ ipcMain.handle('restore-settings', async (event, srcDir) => {
     
     await restoreCopyTarget('config.json', 'config.json');
     await restoreCopyTarget('engine_config.json', 'engine_config.json');
+    await restoreCopyTarget('data', 'data');
     
     const conductorDataBackup = path.join(srcDir, 'conductor_data');
     const conductorDataSrc = path.join(rootDir, 'conductor', 'data');
