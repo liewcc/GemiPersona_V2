@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Direct config file access — works even when the Python engine is offline
   readConfig: () => ipcRenderer.invoke('read-config'),
   writeConfig: (updates) => ipcRenderer.invoke('write-config', updates),
+  backupSettings: (destRoot) => ipcRenderer.invoke('backup-settings', destRoot),
+  restoreSettings: (srcDir) => ipcRenderer.invoke('restore-settings', srcDir),
 
   // CLI Visibility flags
   setHideCliFlag: (hide) => ipcRenderer.invoke('set-hide-cli', hide),

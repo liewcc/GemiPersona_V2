@@ -96,6 +96,28 @@
                     </div>
                 </div>
             </div>
+        <!-- Backup & Restore Card -->
+        <div class="card glass p-20 mb-20">
+            <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px; text-transform: uppercase;">Backup & Restore</div>
+            <p class="text-muted text-small" style="margin: 0 0 15px;">Saves UI settings plus Chrome account profiles (~112MB, browser caches excluded).</p>
+
+            <div class="d-flex align-center" style="gap: 8px; margin-bottom: 12px;">
+                <label style="font-weight: 500; font-size: 13px; width: 130px;">Backup Destination</label>
+                <input type="text" id="backupDir" class="form-control" style="flex: 1;">
+                <button class="btn btn-secondary btn-sm" onclick="browseBackupDir()">📁</button>
+                <button class="btn btn-primary btn-sm" onclick="doBackup()">Backup</button>
+            </div>
+
+            <div class="d-flex align-center" style="gap: 8px; margin-bottom: 12px;">
+                <label style="font-weight: 500; font-size: 13px; width: 130px;">Restore Source</label>
+                <input type="text" id="restoreDir" class="form-control" style="flex: 1;">
+                <button class="btn btn-secondary btn-sm" onclick="browseRestoreDir()">📁</button>
+                <button class="btn btn-danger btn-sm" onclick="doRestore()">Restore</button>
+            </div>
+
+            <span id="backupStatus" style="font-size:12px; color: var(--text-muted);"></span>
+        </div>
+
         <!-- Refused Keywords Card -->
         <div class="card glass p-20 mb-20">
             <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 4px; text-transform: uppercase;">Refusal Detection Keywords</div>
@@ -253,6 +275,102 @@
             }
         }
 
+        // ── Backup & Restore ─────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                if (window.electronAPI) {
+                    const config = await window.electronAPI.readConfig();
+                    document.getElementById('backupDir').value = config.backup_dir || '';
+                    document.getElementById('restoreDir').value = config.restore_dir || '';
+                }
+            } catch (err) {
+                console.error("Failed to load backup config:", err);
+            }
+            
+            const backupDirEl = document.getElementById('backupDir');
+            if (backupDirEl) {
+                backupDirEl.addEventListener('change', async (e) => {
+                    if (window.electronAPI) await window.electronAPI.writeConfig({ backup_dir: e.target.value });
+                });
+            }
+            const restoreDirEl = document.getElementById('restoreDir');
+            if (restoreDirEl) {
+                restoreDirEl.addEventListener('change', async (e) => {
+                    if (window.electronAPI) await window.electronAPI.writeConfig({ restore_dir: e.target.value });
+                });
+            }
+        });
+
+        async function browseBackupDir() {
+            if (!window.electronAPI) return;
+            const current = document.getElementById('backupDir').value;
+            const options = { properties: ['openDirectory'] };
+            if (current) options.defaultPath = current;
+            const result = await window.electronAPI.selectDirectory(options);
+            if (result && result.length > 0) {
+                document.getElementById('backupDir').value = result[0];
+                await window.electronAPI.writeConfig({ backup_dir: result[0] });
+            }
+        }
+
+        async function browseRestoreDir() {
+            if (!window.electronAPI) return;
+            const current = document.getElementById('restoreDir').value;
+            const options = { properties: ['openDirectory'] };
+            if (current) options.defaultPath = current;
+            const result = await window.electronAPI.selectDirectory(options);
+            if (result && result.length > 0) {
+                document.getElementById('restoreDir').value = result[0];
+                await window.electronAPI.writeConfig({ restore_dir: result[0] });
+            }
+        }
+
+        async function doBackup() {
+            if (!window.electronAPI) return;
+            const dest = document.getElementById('backupDir').value;
+            if (!dest) {
+                showStatus('backupStatus', 'Please specify a backup destination first.', true);
+                return;
+            }
+            if (!confirm("Reminder: Please ensure the browser and engine are CLOSED before backing up to avoid locked files or incomplete data. Proceed?")) return;
+            
+            showStatus('backupStatus', 'Backing up... this may take a moment.', false, true);
+            try {
+                const res = await window.electronAPI.backupSettings(dest);
+                if (res.success) {
+                    const mb = (res.bytes / (1024 * 1024)).toFixed(2);
+                    showStatus('backupStatus', `Backup successful! Saved to ${res.path} (${res.file_count} files, ${mb} MB).`, false, true);
+                } else {
+                    showStatus('backupStatus', 'Backup failed: ' + res.error, true, true);
+                }
+            } catch (err) {
+                showStatus('backupStatus', 'Backup failed: ' + err.message, true, true);
+            }
+        }
+
+        async function doRestore() {
+            if (!window.electronAPI) return;
+            const src = document.getElementById('restoreDir').value;
+            if (!src) {
+                showStatus('backupStatus', 'Please specify a restore source first.', true);
+                return;
+            }
+            if (!confirm("WARNING: This will REPLACE all current settings and Chrome profiles.\nThe browser must be CLOSED. A safety copy of your current state will be taken first.\n\nProceed with restore?")) return;
+            
+            showStatus('backupStatus', 'Restoring... this may take a moment.', false, true);
+            try {
+                const res = await window.electronAPI.restoreSettings(src);
+                if (res.success) {
+                    alert(`Restore successful!\nRestored ${res.restored_profiles} profiles.\nA safety copy was saved to:\n${res.safety_copy}`);
+                    location.reload();
+                } else {
+                    showStatus('backupStatus', 'Restore failed: ' + res.error, true, true);
+                }
+            } catch (err) {
+                showStatus('backupStatus', 'Restore failed: ' + err.message, true, true);
+            }
+        }
+
         // ── Keyword Table Helpers ────────────────────────────────────────────
 
         function makeKeywordRow(value, onDelete) {
@@ -288,11 +406,20 @@
                 .filter(v => v.length > 0);
         }
 
-        function showStatus(spanId, msg, isError = false) {
+        function showStatus(spanId, msg, isError = false, persist = false) {
             const el = document.getElementById(spanId);
             el.textContent = msg;
             el.style.color = isError ? '#ff6b6b' : '#6bffb8';
-            setTimeout(() => { el.textContent = ''; }, 3000);
+            if (el._statusTimeout) {
+                clearTimeout(el._statusTimeout);
+                el._statusTimeout = null;
+            }
+            if (!persist) {
+                el._statusTimeout = setTimeout(() => {
+                    el.textContent = '';
+                    el._statusTimeout = null;
+                }, 3000);
+            }
         }
 
         // ── Refused Keywords ─────────────────────────────────────────────────

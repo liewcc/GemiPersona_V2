@@ -16,6 +16,7 @@ node_modules/
 node-portable.zip
 conductor_ui.log*
 browser_user_data/
+backups/
 browser_session_sandbox/
 
 # Local test artifacts

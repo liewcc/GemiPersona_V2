@@ -740,6 +740,214 @@ ipcMain.handle('reorder-profiles', async (event, renameMap) => {
   }
 });
 
+const CACHE_EXCLUDE = ['Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'GraphiteDawnCache'];
+
+async function copyFilteredAsync(src, dest, isProfileDir = false, statsObj = { files: 0, bytes: 0 }) {
+  let stats;
+  try { stats = await fs.promises.stat(src); } catch (e) { return statsObj; }   // replaces the existsSync guard
+  if (stats.isDirectory()) {
+    await fs.promises.mkdir(dest, { recursive: true });
+    for (const item of await fs.promises.readdir(src)) {
+      if (isProfileDir && CACHE_EXCLUDE.includes(item)) continue;
+      await copyFilteredAsync(path.join(src, item), path.join(dest, item), false, statsObj);
+    }
+  } else {
+    await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+    await fs.promises.copyFile(src, dest);
+    statsObj.files++;
+    statsObj.bytes += stats.size;
+  }
+  return statsObj;
+}
+
+async function performBackup(destRoot, isSafetyCopy = false) {
+  if (!fs.existsSync(destRoot)) {
+    fs.mkdirSync(destRoot, { recursive: true });
+  }
+  
+  const d = new Date();
+  const ts = d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0') + '_' +
+    String(d.getHours()).padStart(2, '0') +
+    String(d.getMinutes()).padStart(2, '0') +
+    String(d.getSeconds()).padStart(2, '0');
+  
+  const folderName = isSafetyCopy ? `pre_restore_${ts}` : `backup_${ts}`;
+  const backupDir = path.join(destRoot, folderName);
+  fs.mkdirSync(backupDir, { recursive: true });
+  
+  const rootDir = path.join(__dirname, '..');
+  const browserDataDir = path.join(rootDir, 'Gemi_Engine_V2', 'browser_user_data');
+  
+  const stats = { files: 0, bytes: 0 };
+  const missing = [];
+  const profilesCopied = [];
+  
+  const copyTarget = async (srcRelative, destRelative, isProfile = false) => {
+    const src = path.join(rootDir, srcRelative);
+    const dest = path.join(backupDir, destRelative);
+    if (!fs.existsSync(src)) {
+      missing.push(srcRelative);
+    } else {
+      await copyFilteredAsync(src, dest, isProfile, stats);
+    }
+  };
+  
+  await copyTarget('config.json', 'config.json');
+  await copyTarget('engine_config.json', 'engine_config.json');
+  
+  const conductorDataSrc = path.join(rootDir, 'conductor', 'data');
+  if (fs.existsSync(conductorDataSrc)) {
+    const destDir = path.join(backupDir, 'conductor_data');
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    for (const item of fs.readdirSync(conductorDataSrc)) {
+      if (item.endsWith('.json')) {
+        await copyFilteredAsync(path.join(conductorDataSrc, item), path.join(destDir, item), false, stats);
+      }
+    }
+  } else {
+    missing.push(path.join('conductor', 'data'));
+  }
+  
+  await copyTarget(path.join('Gemi_Engine_V2', 'browser_user_data', 'Local State'), path.join('browser_user_data', 'Local State'));
+  
+  if (fs.existsSync(browserDataDir)) {
+    for (const item of fs.readdirSync(browserDataDir)) {
+      if (/^Profile \d+$/.test(item)) {
+        await copyTarget(path.join('Gemi_Engine_V2', 'browser_user_data', item), path.join('browser_user_data', item), true);
+        profilesCopied.push(item);
+      }
+    }
+  }
+  
+  let appVersion = null;
+  const versionPath = path.join(rootDir, 'version.json');
+  if (fs.existsSync(versionPath)) {
+    try {
+      appVersion = JSON.parse(fs.readFileSync(versionPath, 'utf8')).version || null;
+    } catch (e) {}
+  }
+  
+  const os = require('os');
+  const manifest = {
+    format_version: 1,
+    created_iso: new Date().toISOString(),
+    hostname: os.hostname(),
+    os_user: os.userInfo().username,
+    app_version: appVersion,
+    profiles: profilesCopied,
+    excluded_cache_dirs: CACHE_EXCLUDE,
+    missing_sources: missing,
+    file_count: stats.files,
+    bytes: stats.bytes
+  };
+  
+  fs.writeFileSync(path.join(backupDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf-8');
+  
+  return { path: backupDir, file_count: stats.files, bytes: stats.bytes };
+}
+
+// ponytail: no chrome.exe process detection - we let the copy fail on a locked file and tell the
+// user to close the browser. Ceiling: a race where Chrome opens mid-copy yields a half-written
+// backup. Upgrade path: check for the SingletonLock / lockfile in browser_user_data before starting.
+ipcMain.handle('backup-settings', async (event, destRoot) => {
+  try {
+    const result = await performBackup(destRoot, false);
+    return { success: true, path: result.path, file_count: result.file_count, bytes: result.bytes };
+  } catch (err) {
+    if (['EBUSY', 'EPERM', 'EACCES'].includes(err.code)) {
+      return { success: false, error: `File locked: ${err.path || err.message}. Please close the browser and stop the engine first.` };
+    }
+    return { success: false, error: err.message };
+  }
+});
+
+// ponytail: no chrome.exe process detection - we let the copy fail on a locked file and tell the
+// user to close the browser. Ceiling: a race where Chrome opens mid-copy yields a half-written
+// backup. Upgrade path: check for the SingletonLock / lockfile in browser_user_data before starting.
+ipcMain.handle('restore-settings', async (event, srcDir) => {
+  try {
+    if (!fs.existsSync(srcDir)) {
+      return { success: false, error: `Restore source does not exist: ${srcDir}` };
+    }
+    
+    const manifestPath = path.join(srcDir, 'manifest.json');
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    } catch (e) {
+      return { success: false, error: 'Not a valid backup folder (manifest.json missing or unsupported).' };
+    }
+    
+    if (manifest.format_version !== 1) {
+      return { success: false, error: 'Not a valid backup folder (manifest.json missing or unsupported).' };
+    }
+    
+    const rootDir = path.join(__dirname, '..');
+    const config = loadConfig();
+    const safetyCopyRoot = config.backup_dir || path.join(rootDir, 'backups');
+    
+    const safetyResult = await performBackup(safetyCopyRoot, true);
+    const safetyCopyDir = safetyResult.path;
+    
+    const browserDataDir = path.join(rootDir, 'Gemi_Engine_V2', 'browser_user_data');
+    if (fs.existsSync(browserDataDir)) {
+      const localStatePath = path.join(browserDataDir, 'Local State');
+      if (fs.existsSync(localStatePath)) {
+        await fs.promises.unlink(localStatePath);
+      }
+      for (const item of fs.readdirSync(browserDataDir)) {
+        if (/^Profile \d+$/.test(item)) {
+          await fs.promises.rm(path.join(browserDataDir, item), { recursive: true, force: true });
+        }
+      }
+    }
+    
+    const restoreCopyTarget = async (srcRelative, destRelative) => {
+      const src = path.join(srcDir, srcRelative);
+      const dest = path.join(rootDir, destRelative);
+      if (fs.existsSync(src)) {
+        await copyFilteredAsync(src, dest, false);
+      }
+    };
+    
+    await restoreCopyTarget('config.json', 'config.json');
+    await restoreCopyTarget('engine_config.json', 'engine_config.json');
+    
+    const conductorDataBackup = path.join(srcDir, 'conductor_data');
+    const conductorDataSrc = path.join(rootDir, 'conductor', 'data');
+    if (fs.existsSync(conductorDataBackup)) {
+      if (!fs.existsSync(conductorDataSrc)) fs.mkdirSync(conductorDataSrc, { recursive: true });
+      for (const item of fs.readdirSync(conductorDataBackup)) {
+        if (item.endsWith('.json')) {
+          await copyFilteredAsync(path.join(conductorDataBackup, item), path.join(conductorDataSrc, item), false);
+        }
+      }
+    }
+    
+    await restoreCopyTarget(path.join('browser_user_data', 'Local State'), path.join('Gemi_Engine_V2', 'browser_user_data', 'Local State'));
+    
+    const backupBrowserDataDir = path.join(srcDir, 'browser_user_data');
+    let restoredProfiles = 0;
+    if (fs.existsSync(backupBrowserDataDir)) {
+      for (const item of fs.readdirSync(backupBrowserDataDir)) {
+        if (/^Profile \d+$/.test(item)) {
+          await restoreCopyTarget(path.join('browser_user_data', item), path.join('Gemi_Engine_V2', 'browser_user_data', item));
+          restoredProfiles++;
+        }
+      }
+    }
+    
+    return { success: true, restored_profiles: restoredProfiles, safety_copy: safetyCopyDir };
+  } catch (err) {
+    if (['EBUSY', 'EPERM', 'EACCES'].includes(err.code)) {
+      return { success: false, error: `File locked: ${err.path || err.message}. Please close the browser and stop the engine first.` };
+    }
+    return { success: false, error: err.message };
+  }
+});
+
 
 // ── Git update IPC ─────────────────────────────────────────────────────────────
 function gitExec(args, cwd) {
