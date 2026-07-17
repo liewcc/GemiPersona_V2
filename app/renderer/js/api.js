@@ -84,6 +84,10 @@ const api = {
         return this.request('/browser/automation/stop', 'POST');
     },
 
+    resetSession(config) {
+        return this.request('/browser/reset_session', 'POST', { config: config });
+    },
+
     requestNewChat() {
         return this.request('/browser/automation/request_new_chat', 'POST');
     },

@@ -322,12 +322,124 @@ class AutomationManager:
 
     def stop(self):
         self._stop_event.set()
+        if self._task and not self._task.done():
+            self._task.cancel()
 
     def request_new_chat(self):
         self._needs_new_chat = True
         
     def reset_time_timer(self):
         self._lc_time_threshold_start_time = time.time()
+        
+    async def _init_session(self, config: dict) -> dict:
+        def _step(name):
+            self.automation_status["current_step"] = name
+            logger.info(f"[automation] step: {name}")
+            asyncio.create_task(self.log_to_engine(f"[automation] step: {name}"))
+
+        cfg = _load_root_config()
+        _step("engine_start")
+        await self._post("/engine/start", {
+            "headless": bool(cfg.get("headless", False)),
+            "active_user": self.automation_status["current_account_id"],
+            "profile_name": cfg.get("active_profile"),
+            "active_service": cfg.get("active_service") or "gemini"
+        })
+        _step("new_chat")
+        await self._post("/browser/new_chat", {})
+        if self._stop_event.is_set(): return {"interrupted": True}
+        await asyncio.sleep(2)
+        
+        model_to_apply = config.get("selected_model")
+        tool_to_apply = config.get("selected_sub_tool") or config.get("selected_tool")
+        thinking_to_apply = config.get("selected_thinking_level")
+        
+        try:
+            logger.debug("Performing live discovery scan at new chat...")
+            _step("discover")
+            discovery_resp = await self._post("/browser/discover")
+            discovery_res = discovery_resp.json()
+            
+            sel_model = config.get("selected_model")
+            sel_tool = config.get("selected_tool")
+            sel_sub_tool = config.get("selected_sub_tool")
+            sel_thinking = config.get("selected_thinking_level")
+            
+            model_to_apply = sel_model
+            tool_to_apply = sel_sub_tool or sel_tool
+            thinking_to_apply = sel_thinking
+            
+            if discovery_res.get("status") == "success":
+                discovered = discovery_res.get("data", {})
+                models = discovered.get("models", [])
+                main_tools = discovered.get("main_tools", [])
+                sub_tools = discovered.get("sub_tools", {})
+                thinking_levels = discovered.get("thinking_levels", [])
+                
+                if sel_model and models:
+                    if sel_model not in models:
+                        logger.debug(f"Selected model '{sel_model}' not found in live scan. Leaving empty.")
+                        model_to_apply = None
+                        
+                if sel_thinking and thinking_levels:
+                    if sel_thinking not in thinking_levels:
+                        logger.debug(f"Selected thinking level '{sel_thinking}' not found in live scan. Leaving empty.")
+                        thinking_to_apply = None
+                        
+                if sel_tool and main_tools:
+                    if sel_tool in main_tools:
+                        if sel_tool in sub_tools:
+                            if sel_sub_tool and sub_tools.get(sel_tool):
+                                if sel_sub_tool in sub_tools[sel_tool]:
+                                    tool_to_apply = sel_sub_tool
+                                else:
+                                    logger.debug(f"Selected sub-tool '{sel_sub_tool}' not found under '{sel_tool}'. Leaving empty.")
+                                    tool_to_apply = None
+                            else:
+                                tool_to_apply = sel_sub_tool
+                        else:
+                            tool_to_apply = sel_tool
+                    else:
+                        logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
+                        tool_to_apply = None
+            else:
+                logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
+            
+            _step("apply_settings")
+            await self._post("/browser/apply_settings", {
+                "model": model_to_apply,
+                "tool": tool_to_apply,
+                "thinking_level": thinking_to_apply
+            })
+            
+            has_files = config.get("selected_files")
+            if has_files:
+                _step("attach_files")
+                for f_path in has_files:
+                    await self._post("/browser/file/add", {"path": f_path})
+        except Exception as e:
+            logger.warning(f"Settings setup failed: {e}")
+
+        _step("prompt")
+        ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
+        self._ar_ratio, self._ar_dynamic, self._ar_idx = ratio, ar_dynamic, ar_idx
+        final_prompt, clean_prompt = _inject_ratio(config.get("prompt", ""), ratio)
+        config["aspect_ratio"] = ratio
+        config["prompt_clean"] = clean_prompt
+        await self._post("/browser/prompt", {"text": final_prompt})
+        if self._stop_event.is_set(): return {"interrupted": True}
+        
+        _step("submit")
+        await self._post("/browser/submit", {})
+        if self._stop_event.is_set(): return {"interrupted": True}
+        
+        return {
+            "model": model_to_apply,
+            "tool": tool_to_apply,
+            "thinking_level": thinking_to_apply,
+            "aspect_ratio": ratio,
+            "prompt": final_prompt
+        }
         
     async def _run_loop(self):
         try:
@@ -386,96 +498,7 @@ class AutomationManager:
                 
                 try:
                     if is_initial:
-                        cfg = _load_root_config()
-                        _step("engine_start")
-                        await self._post("/engine/start", {
-                            "headless": bool(cfg.get("headless", False)),
-                            "active_user": self.automation_status["current_account_id"],
-                            "profile_name": cfg.get("active_profile"),
-                            "active_service": cfg.get("active_service") or "gemini"
-                        })
-                        _step("new_chat")
-                        await self._post("/browser/new_chat", {})
-                        if self._stop_event.is_set(): break
-                        await asyncio.sleep(2)
-                        
-                        try:
-                            logger.debug("Performing live discovery scan at new chat...")
-                            _step("discover")
-                            discovery_resp = await self._post("/browser/discover")
-                            discovery_res = discovery_resp.json()
-                            
-                            sel_model = self.config.get("selected_model")
-                            sel_tool = self.config.get("selected_tool")
-                            sel_sub_tool = self.config.get("selected_sub_tool")
-                            sel_thinking = self.config.get("selected_thinking_level")
-                            
-                            model_to_apply = sel_model
-                            tool_to_apply = sel_sub_tool or sel_tool
-                            thinking_to_apply = sel_thinking
-                            
-                            if discovery_res.get("status") == "success":
-                                discovered = discovery_res.get("data", {})
-                                models = discovered.get("models", [])
-                                main_tools = discovered.get("main_tools", [])
-                                sub_tools = discovered.get("sub_tools", {})
-                                thinking_levels = discovered.get("thinking_levels", [])
-                                
-                                if sel_model and models:
-                                    if sel_model not in models:
-                                        logger.debug(f"Selected model '{sel_model}' not found in live scan. Leaving empty.")
-                                        model_to_apply = None
-                                        
-                                if sel_thinking and thinking_levels:
-                                    if sel_thinking not in thinking_levels:
-                                        logger.debug(f"Selected thinking level '{sel_thinking}' not found in live scan. Leaving empty.")
-                                        thinking_to_apply = None
-                                        
-                                if sel_tool and main_tools:
-                                    if sel_tool in main_tools:
-                                        if sel_tool in sub_tools:
-                                            if sel_sub_tool and sub_tools.get(sel_tool):
-                                                if sel_sub_tool in sub_tools[sel_tool]:
-                                                    tool_to_apply = sel_sub_tool
-                                                else:
-                                                    logger.debug(f"Selected sub-tool '{sel_sub_tool}' not found under '{sel_tool}'. Leaving empty.")
-                                                    tool_to_apply = None
-                                            else:
-                                                tool_to_apply = sel_sub_tool
-                                        else:
-                                            tool_to_apply = sel_tool
-                                    else:
-                                        logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
-                                        tool_to_apply = None
-                            else:
-                                logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
-                            
-                            _step("apply_settings")
-                            await self._post("/browser/apply_settings", {
-                                "model": model_to_apply,
-                                "tool": tool_to_apply,
-                                "thinking_level": thinking_to_apply
-                            })
-                            
-                            has_files = self.config.get("selected_files")
-                            if has_files:
-                                _step("attach_files")
-                                for f_path in has_files:
-                                    await self._post("/browser/file/add", {"path": f_path})
-                        except Exception as e:
-                            logger.warning(f"Settings setup failed: {e}")
-
-                        _step("prompt")
-                        ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
-                        self._ar_ratio, self._ar_dynamic, self._ar_idx = ratio, ar_dynamic, ar_idx
-                        final_prompt, clean_prompt = _inject_ratio(self.config.get("prompt", ""), ratio)
-                        self.config["aspect_ratio"] = ratio
-                        self.config["prompt_clean"] = clean_prompt
-                        await self._post("/browser/prompt", {"text": final_prompt})
-                        if self._stop_event.is_set(): break
-                        
-                        _step("submit")
-                        await self._post("/browser/submit", {})
+                        await self._init_session(self.config)
                         if self._stop_event.is_set(): break
                         self._needs_new_chat = False
                     else:

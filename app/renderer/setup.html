@@ -1960,13 +1960,17 @@
         }
 
         async function sendPromptToBrowser() {
-            const text = document.getElementById('promptTarget').value;
             try {
-                appendLog(`Filling prompt into browser: ${text.substring(0, 30)}...`, 'info');
-                await api.setPrompt(text, 'default');
-                appendLog('Prompt filled successfully.', 'success');
+                appendLog('Resetting session with new settings...', 'info');
+                const config = await buildCurrentConfig();
+                const res = await api.resetSession(config);
+                if (res.status === 'success') {
+                    appendLog(`Session reset complete (model: ${res.session.model || 'N/A'}, tool: ${res.session.tool || 'N/A'})`, 'success');
+                } else {
+                    appendLog(`Apply failed: ${res.message}`, 'error');
+                }
             } catch (err) {
-                appendLog(`Send prompt failed: ${err.message}`, 'error');
+                appendLog(`Apply failed: ${err.message}`, 'error');
             }
         }
 
@@ -2106,19 +2110,32 @@
             }
         }
 
+        async function buildCurrentConfig() {
+            const currentConfig = await api.getConfig();
+            currentConfig.selected_files = selectedFilesList;
+            currentConfig.prompt = document.getElementById('promptTarget').value;
+            currentConfig.selected_tool = document.getElementById('toolSelect').value;
+            currentConfig.selected_sub_tool = document.getElementById('subToolSelect').value;
+            currentConfig.selected_model = document.getElementById('modelSelect').value;
+            currentConfig.selected_thinking_level = document.getElementById('thinkingLevelSelect').value;
+            currentConfig.save_dir = document.getElementById('saveDirInput').value;
+            currentConfig.name_prefix = document.getElementById('filePrefixInput').value;
+            currentConfig.name_padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
+            const startVal = parseInt(document.getElementById('nameStartInput').value);
+            currentConfig.name_start = isNaN(startVal) ? 1 : startVal;
+            currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
+            return currentConfig;
+        }
+
         async function applyToolModelSettings() {
-            const tool = document.getElementById('toolSelect').value;
-            const subTool = document.getElementById('subToolSelect').value;
-            const model = document.getElementById('modelSelect').value;
-            const thinkingLevel = document.getElementById('thinkingLevelSelect').value;
             try {
-                const toolToApply = subTool || tool;
-                appendLog(`Applying browser settings: ${model} / ${toolToApply} / ${thinkingLevel}...`, 'info');
-                const resp = await api.applySettings({ model, tool: toolToApply, thinking_level: thinkingLevel });
-                if (resp.status === 'success') {
-                    appendLog('Settings applied successfully.', 'success');
+                appendLog('Resetting session with new settings...', 'info');
+                const config = await buildCurrentConfig();
+                const res = await api.resetSession(config);
+                if (res.status === 'success') {
+                    appendLog(`Session reset complete (model: ${res.session.model || 'N/A'}, tool: ${res.session.tool || 'N/A'})`, 'success');
                 } else {
-                    appendLog(`Apply failed: ${resp.message}`, 'error');
+                    appendLog(`Apply failed: ${res.message}`, 'error');
                 }
             } catch (err) {
                 appendLog(`Apply failed: ${err.message}`, 'error');
@@ -2276,11 +2293,16 @@
                 return;
             }
             try {
-                appendLog(`Syncing ${selectedFilesList.length} files with browser...`, 'info');
-                const resp = await api.attachFiles(selectedFilesList);
-                appendLog(`Sync complete: Added ${resp.added}, Removed ${resp.removed}`, 'success');
+                appendLog('Resetting session with new settings...', 'info');
+                const config = await buildCurrentConfig();
+                const res = await api.resetSession(config);
+                if (res.status === 'success') {
+                    appendLog(`Session reset complete (model: ${res.session.model || 'N/A'}, tool: ${res.session.tool || 'N/A'})`, 'success');
+                } else {
+                    appendLog(`Apply failed: ${res.message}`, 'error');
+                }
             } catch (err) {
-                appendLog(`Sync attachments failed: ${err.message}`, 'error');
+                appendLog(`Apply failed: ${err.message}`, 'error');
             }
         }
 
@@ -2306,7 +2328,17 @@
 
         async function saveNamingFields() {
             if (isConfigLoading) return;
-            const saveDir = document.getElementById('saveDirInput').value;
+            const saveDir = document.getElementById('saveDirInput').value.trim();
+            if (saveDir && window.electronAPI && window.electronAPI.ensureDirectory) {
+                const res = await window.electronAPI.ensureDirectory(saveDir);
+                if (res && res.error) {
+                    appendLog(`Cannot create download folder "${saveDir}": ${res.error}`, 'error');
+                    return;
+                }
+                if (res && res.created) {
+                    appendLog(`Created download folder: ${saveDir}`, 'success');
+                }
+            }
             const prefix = document.getElementById('filePrefixInput').value;
             const padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
             const startVal = parseInt(document.getElementById('nameStartInput').value);

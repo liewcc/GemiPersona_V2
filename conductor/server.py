@@ -431,6 +431,31 @@ async def get_engine_profiles_ep():
     ]
     return {"profiles": profiles}
 
+class ResetSessionRequest(BaseModel):
+    config: dict = {}
+
+@app.post("/browser/reset_session")
+async def reset_session(req: ResetSessionRequest):
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(get_engine_url() + "/engine/interrupt")
+    except Exception as e:
+        logger.warning(f"reset_session: interrupt post failed: {e}")
+
+    if automation_manager.automation_status["is_running"]:
+        automation_manager.stop()
+        for _ in range(20):
+            if not automation_manager.automation_status["is_running"]:
+                break
+            await asyncio.sleep(0.1)
+
+    try:
+        res = await automation_manager._init_session(req.config)
+        return {"status": "success", "session": res}
+    except Exception as e:
+        logger.error(f"reset_session failed: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
 async def proxy_to_engine(request: Request, path: str):
