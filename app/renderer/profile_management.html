@@ -930,15 +930,18 @@
         async function triggerOpenDownloadFolder(e) {
             if (e) e.preventDefault();
             try {
-                const cfg = await api.getConfig();
-                const saveDir = cfg.save_dir;
-                if (saveDir && window.electronAPI && window.electronAPI.openDirectory) {
-                    await window.electronAPI.openDirectory(saveDir);
+                const config = await window.electronAPI.readConfig();
+                const saveDir = config.save_dir;
+                if (saveDir) {
+                    const result = await window.electronAPI.openFile(saveDir);
+                    if (result) {
+                        alert("Error opening download folder: " + result);
+                    }
                 } else {
-                    console.error('Download folder not set or Electron API not available');
+                    alert("Download folder has not been configured in setup yet.");
                 }
             } catch (err) {
-                console.error(err);
+                alert("Failed to fetch configuration: " + err.message);
             }
         }
 
