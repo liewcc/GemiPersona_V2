@@ -34,7 +34,8 @@ if (-not (Test-Path $pythonDir)) {
                 "# Uncomment to run site.main() automatically",
                 "import site"
             )
-            Set-Content -Path $pthFile.FullName -Value $pthContent -Encoding utf8
+            # Use ASCII to avoid UTF-8 BOM on PowerShell 5.1 which breaks Python startup
+            Set-Content -Path $pthFile.FullName -Value $pthContent -Encoding ascii
         }
         
         # Download and install pip
