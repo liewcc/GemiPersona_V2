@@ -230,11 +230,10 @@ class AutomationManager:
         
         self._lc_time_threshold_start_time = None
         self._needs_new_chat = True
-        # Live tool/model discovery only needs to run once per browser session
-        # (the web app's tool set changes on browser (re)start, not per account
-        # or per new chat). Set True at loop start/continue and on any browser
-        # restart (profile switch, quota switch, re_login); cleared after a
-        # successful scan in _init_session.
+        # Live tool/model discovery runs ONCE per conductor process: the web
+        # app's tool set is static, so redo, continue, account switch, and
+        # re_login must NOT rescan. Cleared after the first successful scan in
+        # _init_session; a failed scan leaves it True so the next init retries.
         self._needs_discovery = True
         self._session_lost = False
         self._run_id = None
@@ -284,8 +283,6 @@ class AutomationManager:
             return False
             
         self._stop_event.clear()
-        # Fresh loop start / continue: rescan the web UI once on the next init.
-        self._needs_discovery = True
 
         self.automation_status.update({
             "is_running": True,
@@ -388,8 +385,8 @@ class AutomationManager:
                 main_tools = discovered.get("main_tools", [])
                 sub_tools = discovered.get("sub_tools", {})
                 thinking_levels = discovered.get("thinking_levels", [])
-                # Web tool set is stable for this browser session; don't rescan
-                # on subsequent new chats / account switches until a restart.
+                # Web tool set is static; never rescan for the rest of this
+                # conductor process (redo / continue / account switch included).
                 self._needs_discovery = False
 
                 if sel_model and models:
@@ -714,7 +711,6 @@ class AutomationManager:
         elif action == "re_login":
             await self._post("/engine/re_login", {})
             self._needs_new_chat = True
-            self._needs_discovery = True  # browser session restarted
             health_db.record_event(
                 self._run_id, "re_login",
                 account=self.automation_status["current_account_id"])
@@ -742,7 +738,6 @@ class AutomationManager:
             extra={"from": cur, "reason": "loop_control"})
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
-        self._needs_discovery = True  # browser session restarted for new profile
 
     async def _handle_quota(self):
         health_db.record_event(
@@ -792,4 +787,3 @@ class AutomationManager:
         self.automation_status["current_account_id"] = next_user
         self._lc_time_threshold_start_time = time.time()  # new account starts with a fresh timer
         self._needs_new_chat = True
-        self._needs_discovery = True  # browser session restarted for new profile
