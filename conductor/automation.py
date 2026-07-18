@@ -230,6 +230,12 @@ class AutomationManager:
         
         self._lc_time_threshold_start_time = None
         self._needs_new_chat = True
+        # Live tool/model discovery only needs to run once per browser session
+        # (the web app's tool set changes on browser (re)start, not per account
+        # or per new chat). Set True at loop start/continue and on any browser
+        # restart (profile switch, quota switch, re_login); cleared after a
+        # successful scan in _init_session.
+        self._needs_discovery = True
         self._session_lost = False
         self._run_id = None
         self._ar_ratio = ""
@@ -278,7 +284,9 @@ class AutomationManager:
             return False
             
         self._stop_event.clear()
-        
+        # Fresh loop start / continue: rescan the web UI once on the next init.
+        self._needs_discovery = True
+
         self.automation_status.update({
             "is_running": True,
             "mode": mode,
@@ -355,27 +363,35 @@ class AutomationManager:
         thinking_to_apply = config.get("selected_thinking_level")
         
         try:
-            logger.debug("Performing live discovery scan at new chat...")
-            _step("discover")
-            discovery_resp = await self._post("/browser/discover")
-            discovery_res = discovery_resp.json()
-            
             sel_model = config.get("selected_model")
             sel_tool = config.get("selected_tool")
             sel_sub_tool = config.get("selected_sub_tool")
             sel_thinking = config.get("selected_thinking_level")
-            
+
             model_to_apply = sel_model
             tool_to_apply = sel_sub_tool or sel_tool
             thinking_to_apply = sel_thinking
-            
+
+            # Only scan the web UI once per browser session. When skipped, apply
+            # the selected config values directly (already set above).
+            if self._needs_discovery:
+                logger.debug("Performing live discovery scan at new chat...")
+                _step("discover")
+                discovery_resp = await self._post("/browser/discover")
+                discovery_res = discovery_resp.json()
+            else:
+                discovery_res = {"status": "skipped"}
+
             if discovery_res.get("status") == "success":
                 discovered = discovery_res.get("data", {})
                 models = discovered.get("models", [])
                 main_tools = discovered.get("main_tools", [])
                 sub_tools = discovered.get("sub_tools", {})
                 thinking_levels = discovered.get("thinking_levels", [])
-                
+                # Web tool set is stable for this browser session; don't rescan
+                # on subsequent new chats / account switches until a restart.
+                self._needs_discovery = False
+
                 if sel_model and models:
                     if sel_model not in models:
                         logger.debug(f"Selected model '{sel_model}' not found in live scan. Leaving empty.")
@@ -402,7 +418,7 @@ class AutomationManager:
                     else:
                         logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
                         tool_to_apply = None
-            else:
+            elif discovery_res.get("status") != "skipped":
                 logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
             
             _step("apply_settings")
@@ -698,6 +714,7 @@ class AutomationManager:
         elif action == "re_login":
             await self._post("/engine/re_login", {})
             self._needs_new_chat = True
+            self._needs_discovery = True  # browser session restarted
             health_db.record_event(
                 self._run_id, "re_login",
                 account=self.automation_status["current_account_id"])
@@ -725,6 +742,7 @@ class AutomationManager:
             extra={"from": cur, "reason": "loop_control"})
         self.automation_status["current_account_id"] = next_user
         self._needs_new_chat = True
+        self._needs_discovery = True  # browser session restarted for new profile
 
     async def _handle_quota(self):
         health_db.record_event(
@@ -774,3 +792,4 @@ class AutomationManager:
         self.automation_status["current_account_id"] = next_user
         self._lc_time_threshold_start_time = time.time()  # new account starts with a fresh timer
         self._needs_new_chat = True
+        self._needs_discovery = True  # browser session restarted for new profile
