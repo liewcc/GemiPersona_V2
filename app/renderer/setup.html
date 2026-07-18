@@ -1315,15 +1315,24 @@
                 }
             }
 
-            // Auto Continue Loop: trigger when browser transitions from offline to online
-            if (isBrowserOnline && prevBrowserOnline === false) {
+            // Auto Continue Loop: fire once when the browser is online and we haven't
+            // auto-continued yet this session. prevBrowserOnline is null on a fresh page
+            // load, so an edge-only (false->true) check would miss the case where the
+            // browser is ALREADY online at launch (engine survived a UI reopen). Treating
+            // null like false covers both the transition and the already-online case.
+            if (isBrowserOnline && prevBrowserOnline !== true) {
                 const autoContinueEnabled = document.getElementById('autoContinueLoopToggle')?.checked;
                 if (autoContinueEnabled && !autoContinuedLoop) {
                     autoContinuedLoop = true;
                     sessionStorage.setItem('autoContinuedLoop', 'true');
-                    appendLog('Browser online. Auto-continuing loop...', 'info');
-                    const clearPending = localConfig?.automation?.continue_clear_pending !== false;
-                    setTimeout(() => executeContinueAutomation(clearPending), 800);
+                    // Don't double-start: the engine's loop may already be running in the
+                    // already-online case (that's why the status can show RUNNING).
+                    const stats = await api.getAutomationStats().catch(() => null);
+                    if (!stats || !stats.is_running) {
+                        appendLog('Browser online. Auto-continuing loop...', 'info');
+                        const clearPending = localConfig?.automation?.continue_clear_pending !== false;
+                        setTimeout(() => executeContinueAutomation(clearPending), 800);
+                    }
                 }
             }
             if (!isBrowserOnline) {

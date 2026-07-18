@@ -409,27 +409,8 @@
                     <!-- Status Banner -->
                     <div id="statusBanner" class="status-banner"></div>
 
-                    <!-- Charts Layout -->
-                    <div class="health-grid" style="flex: 1 1 44%; min-height: 0;">
-                        <!-- Chart 1: Grouped Bar Chart -->
-                        <div class="card glass chart-card">
-                            <div class="card-header">📊 Aggregates per Account</div>
-                            <div class="chart-container">
-                                <canvas id="barChart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Chart 2: Success Duration Line Chart -->
-                        <div class="card glass chart-card">
-                            <div class="card-header">📈 Success Cycle Durations</div>
-                            <div class="chart-container">
-                                <canvas id="lineChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Event History Card -->
-                    <div class="card glass mb-15 p-15" id="eventHistoryCard" style="flex: 1 1 56%; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0;">
+                    <div class="card glass mb-15 p-15" id="eventHistoryCard" style="flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-bottom: 0;">
                         <div class="d-flex justify-between align-center mb-15 pb-10" style="border-bottom: 1px solid var(--border);">
                             <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; text-transform: uppercase;">📋 Event History</div>
                             <div class="d-flex align-center gap-15">
@@ -643,13 +624,10 @@
     <script src="js/chart.min.js"></script>
     <script src="js/api.js"></script>
     <script>
-        let barChartInstance = null;
-        let lineChartInstance = null;
         let eventHistoryChartInstance = null;
         let insightsChartInstance = null;
 
         let tab1FilteredEvents = [];
-        let tab1SummaryCache = [];
         let showTableModeTab1 = false;
 
         let runsListCache = [];
@@ -707,125 +685,14 @@
             clearStatus();
 
             try {
-                // 1. Fetch Aggregates/Summary for Chart 1
-                const summaryResp = await api.getHealthSummary({ group_by: 'account' });
-                const summaryData = summaryResp.summary || [];
-                tab1SummaryCache = summaryData;
-                renderBarChart(summaryData);
-
-                // 2. Fetch Events for Line Chart
-                const eventsParams = { limit: 2000 };
-                const eventsResp = await api.getHealthEvents(eventsParams);
-                const eventsData = eventsResp.events || [];
-                renderLineChart(eventsData);
-
-                // 3. Render event history card
+                // Fetch events and render the event history card
+                const eventsResp = await api.getHealthEvents({ limit: 2000 });
                 tab1FilteredEvents = eventsResp.events || [];
                 renderEventHistory();
 
             } catch (err) {
                 showStatus("Failed to load health statistics: " + err.message, 'error');
             }
-        }
-
-        // Render Grouped Bar Chart
-        function renderBarChart(data) {
-            if (barChartInstance) {
-                barChartInstance.destroy();
-            }
-
-            const ctx = document.getElementById('barChart').getContext('2d');
-            
-            const labels = data.map(r => r.grp || 'Unknown');
-            const successes = data.map(r => r.successes || 0);
-            const refusals = data.map(r => r.refusals || 0);
-            const resets = data.map(r => r.resets || 0);
-            const quotaHits = data.map(r => r.quota_hits || 0);
-
-            barChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Successes', data: successes, backgroundColor: 'rgba(16, 185, 129, 0.75)', borderColor: 'rgb(16, 185, 129)', borderWidth: 1 },
-                        { label: 'Refusals', data: refusals, backgroundColor: 'rgba(245, 158, 11, 0.75)', borderColor: 'rgb(245, 158, 11)', borderWidth: 1 },
-                        { label: 'Resets', data: resets, backgroundColor: 'rgba(239, 68, 68, 0.75)', borderColor: 'rgb(239, 68, 68)', borderWidth: 1 },
-                        { label: 'Quota Hits', data: quotaHits, backgroundColor: 'rgba(139, 92, 246, 0.75)', borderColor: 'rgb(139, 92, 246)', borderWidth: 1 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: 'hsl(210, 40%, 96%)', font: { family: 'Google Sans, sans-serif' } } }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' }, precision: 0 }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Render Success Durations Line Chart
-        function renderLineChart(events) {
-            if (lineChartInstance) {
-                lineChartInstance.destroy();
-            }
-
-            const ctx = document.getElementById('lineChart').getContext('2d');
-
-            // Filter for event_type === 'success' and sort events oldest to newest (since query returns newest first)
-            const successEvents = events
-                .filter(e => e.event_type === 'success')
-                .reverse();
-
-            const labels = successEvents.map(e => {
-                const d = new Date(e.ts * 1000);
-                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + d.toLocaleDateString([], { month: 'numeric', day: 'numeric' }) + ')';
-            });
-            const dataPoints = successEvents.map(e => e.duration_sec || 0);
-
-            lineChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Duration (sec)',
-                        data: dataPoints,
-                        borderColor: 'rgb(99, 102, 241)',
-                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
-                        borderWidth: 2,
-                        tension: 0.2,
-                        fill: true,
-                        pointRadius: 3,
-                        pointHoverRadius: 5
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: 'hsl(210, 40%, 96%)', font: { family: 'Google Sans, sans-serif' } } }
-                    },
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
-                        }
-                    }
-                }
-            });
         }
 
         // Clear health database entries helper removed
@@ -924,9 +791,15 @@
             // their status colour still reads. Log axes cannot plot <= 0.
             const stubHeight = Math.max(1, maxDuration * 0.02);
 
+            // Switch the Y axis to minutes once durations run past a minute, so
+            // long cycles don't produce an unreadable pile of large second values.
+            const useMinutes = maxDuration > 60;
+            const unitDivisor = useMinutes ? 60 : 1;
+
             const labels = data.map((e, index) => index + 1);
             const yValues = data.map(e => {
-                const val = e.event_type === 'success' ? (e.duration_sec || 0) : stubHeight;
+                const raw = e.event_type === 'success' ? (e.duration_sec || 0) : stubHeight;
+                const val = raw / unitDivisor;
                 return (yScale === 'logarithmic' && val <= 0) ? 0.01 : val;
             });
             
@@ -1031,6 +904,11 @@
                         },
                         y: {
                             type: yScale,
+                            title: {
+                                display: true,
+                                text: useMinutes ? 'Duration (min)' : 'Duration (sec)',
+                                color: 'hsl(215, 20%, 65%)'
+                            },
                             grid: { color: 'rgba(255, 255, 255, 0.05)' },
                             ticks: { color: 'hsl(215, 20%, 65%)', font: { family: 'Google Sans, sans-serif' } }
                         }
@@ -1553,8 +1431,6 @@
         let _tab1ResizeTimer = null;
 
         function renderTab1Charts() {
-            if (tab1SummaryCache.length) renderBarChart(tab1SummaryCache);
-            if (tab1FilteredEvents.length) renderLineChart(tab1FilteredEvents);
             renderEventHistory();
             tab1ChartsStale = false;
         }
