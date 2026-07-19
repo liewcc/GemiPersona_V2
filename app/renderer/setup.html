@@ -1960,16 +1960,19 @@
         async function savePromptToConfig() {
             const text = document.getElementById('promptTarget').value;
             await saveConfigField('prompt', text);
-            
-            const stats = await api.getAutomationStats();
-            if (stats && stats.is_running) {
-                await api.requestNewChat();
-                appendLog('Prompt saved. Will apply on next cycle.', 'info');
-            }
+            appendLog('Prompt saved.', 'success');
         }
 
         async function sendPromptToBrowser() {
             try {
+                const stats = await api.getAutomationStats();
+                const text = document.getElementById('promptTarget').value;
+                await saveConfigField('prompt', text);
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Prompt saved. Will apply on next cycle.', 'info');
+                    return;
+                }
                 appendLog('Resetting session with new settings...', 'info');
                 const config = await buildCurrentConfig();
                 const res = await api.resetSession(config);
@@ -2110,13 +2113,7 @@
             await saveConfigField('selected_model', model);
             await saveConfigField('selected_thinking_level', thinkingLevel);
             
-            const stats = await api.getAutomationStats();
-            if (stats && stats.is_running) {
-                await api.requestNewChat();
-                appendLog('Tool/Model/Thinking settings saved. Will apply on next cycle.', 'info');
-            } else {
-                appendLog('Tool/Model/Thinking settings saved.', 'success');
-            }
+            appendLog('Tool/Model/Thinking settings saved.', 'success');
         }
 
         async function buildCurrentConfig() {
@@ -2138,6 +2135,23 @@
 
         async function applyToolModelSettings() {
             try {
+                const tool = document.getElementById('toolSelect').value;
+                const subTool = document.getElementById('subToolSelect').value;
+                const model = document.getElementById('modelSelect').value;
+                const thinkingLevel = document.getElementById('thinkingLevelSelect').value;
+
+                await saveConfigField('selected_tool', tool);
+                await saveConfigField('selected_sub_tool', subTool);
+                await saveConfigField('selected_model', model);
+                await saveConfigField('selected_thinking_level', thinkingLevel);
+
+                const stats = await api.getAutomationStats();
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Settings saved. Will apply on next cycle.', 'info');
+                    return;
+                }
+
                 appendLog('Resetting session with new settings...', 'info');
                 const config = await buildCurrentConfig();
                 const res = await api.resetSession(config);
@@ -2170,14 +2184,11 @@
                         }
                     });
                     setLastPath('uploadFiles', getDirFromPath(filePaths[0]));
-                    await api.saveConfig({ selected_files: selectedFilesList });
-                    const stats = await api.getAutomationStats();
-                    if (stats && stats.is_running) {
-                        await api.requestNewChat();
-                        appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
-                    }
                     renderUploadFilesPreviews();
                     appendLog(`Added ${filePaths.length} files to upload queue.`, 'success');
+                    api.saveConfig({ selected_files: selectedFilesList }).catch(err => {
+                        console.error('Failed to save config in background:', err);
+                    });
                 }
             } catch (err) {
                 console.error(err);
@@ -2283,40 +2294,31 @@
 
         async function removeUploadFile(path) {
             selectedFilesList = selectedFilesList.filter(p => p !== path);
-            await api.saveConfig({ selected_files: selectedFilesList });
-            const stats = await api.getAutomationStats();
-            if (stats && stats.is_running) {
-                await api.requestNewChat();
-                appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
-            }
             renderUploadFilesPreviews();
             appendLog(`Removed file from queue.`, 'info');
+            api.saveConfig({ selected_files: selectedFilesList }).catch(err => {
+                console.error('Failed to save config in background:', err);
+            });
         }
 
         async function clearUploadFiles() {
-            try {
-                appendLog('Clearing browser attachments...', 'info');
-                await api.clearAttachments();
-                selectedFilesList = [];
-                await api.saveConfig({ selected_files: [] });
-                const stats = await api.getAutomationStats();
-                if (stats && stats.is_running) {
-                    await api.requestNewChat();
-                    appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
-                }
-                renderUploadFilesPreviews();
-                appendLog('All upload queue and attachments cleared.', 'success');
-            } catch (err) {
-                appendLog(`Clear attachments failed: ${err.message}`, 'error');
-            }
+            selectedFilesList = [];
+            renderUploadFilesPreviews();
+            appendLog('Upload queue cleared.', 'success');
+            api.saveConfig({ selected_files: [] }).catch(err => {
+                console.error('Failed to save config in background:', err);
+            });
         }
 
         async function sendUploadFiles() {
-            if (selectedFilesList.length === 0) {
-                appendLog('No files to send.', 'error');
-                return;
-            }
             try {
+                await api.saveConfig({ selected_files: selectedFilesList });
+                const stats = await api.getAutomationStats();
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Upload list saved. Will apply on next cycle.', 'info');
+                    return;
+                }
                 appendLog('Resetting session with new settings...', 'info');
                 const config = await buildCurrentConfig();
                 const res = await api.resetSession(config);
@@ -3102,9 +3104,6 @@
             const btnUploadFile = document.getElementById('btnUploadFile');
 
             if (btnUrlSend) btnUrlSend.disabled = is_running;
-            if (btnPromptSend) btnPromptSend.disabled = is_running;
-            if (btnUploadSend) btnUploadSend.disabled = is_running;
-            if (btnApplySettings) btnApplySettings.disabled = is_running;
             if (btnSubmitPrompt) btnSubmitPrompt.disabled = is_running;
             if (btnUploadFile) btnUploadFile.disabled = is_running;
         }

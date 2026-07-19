@@ -355,15 +355,33 @@ class AutomationManager:
         if self._stop_event.is_set(): return {"interrupted": True}
         await asyncio.sleep(2)
         
-        model_to_apply = config.get("selected_model")
-        tool_to_apply = config.get("selected_sub_tool") or config.get("selected_tool")
-        thinking_to_apply = config.get("selected_thinking_level")
+        model_to_apply = cfg.get("selected_model")
+        if model_to_apply is None:
+            model_to_apply = config.get("selected_model")
+        
+        cfg_tool = cfg.get("selected_sub_tool") or cfg.get("selected_tool")
+        if cfg_tool is not None:
+            tool_to_apply = cfg_tool
+        else:
+            tool_to_apply = config.get("selected_sub_tool") or config.get("selected_tool")
+            
+        thinking_to_apply = cfg.get("selected_thinking_level")
+        if thinking_to_apply is None:
+            thinking_to_apply = config.get("selected_thinking_level")
         
         try:
-            sel_model = config.get("selected_model")
-            sel_tool = config.get("selected_tool")
-            sel_sub_tool = config.get("selected_sub_tool")
-            sel_thinking = config.get("selected_thinking_level")
+            sel_model = cfg.get("selected_model")
+            if sel_model is None:
+                sel_model = config.get("selected_model")
+            sel_tool = cfg.get("selected_tool")
+            if sel_tool is None:
+                sel_tool = config.get("selected_tool")
+            sel_sub_tool = cfg.get("selected_sub_tool")
+            if sel_sub_tool is None:
+                sel_sub_tool = config.get("selected_sub_tool")
+            sel_thinking = cfg.get("selected_thinking_level")
+            if sel_thinking is None:
+                sel_thinking = config.get("selected_thinking_level")
 
             model_to_apply = sel_model
             tool_to_apply = sel_sub_tool or sel_tool
