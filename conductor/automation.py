@@ -425,7 +425,9 @@ class AutomationManager:
                 "thinking_level": thinking_to_apply
             })
             
-            has_files = config.get("selected_files")
+            # Live-read: the UI saves selected_files to config.json mid-run;
+            # the snapshot taken at start() would resend the stale list.
+            has_files = _load_root_config().get("selected_files") or config.get("selected_files")
             if has_files:
                 _step("attach_files")
                 for f_path in has_files:
@@ -436,7 +438,10 @@ class AutomationManager:
         _step("prompt")
         ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
         self._ar_ratio, self._ar_dynamic, self._ar_idx = ratio, ar_dynamic, ar_idx
-        final_prompt, clean_prompt = _inject_ratio(config.get("prompt", ""), ratio)
+        live_prompt = _load_root_config().get("prompt")
+        if live_prompt is None:
+            live_prompt = config.get("prompt", "")
+        final_prompt, clean_prompt = _inject_ratio(live_prompt, ratio)
         config["aspect_ratio"] = ratio
         config["prompt_clean"] = clean_prompt
         await self._post("/browser/prompt", {"text": final_prompt})

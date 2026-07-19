@@ -2171,6 +2171,11 @@
                     });
                     setLastPath('uploadFiles', getDirFromPath(filePaths[0]));
                     await api.saveConfig({ selected_files: selectedFilesList });
+                    const stats = await api.getAutomationStats();
+                    if (stats && stats.is_running) {
+                        await api.requestNewChat();
+                        appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
+                    }
                     renderUploadFilesPreviews();
                     appendLog(`Added ${filePaths.length} files to upload queue.`, 'success');
                 }
@@ -2279,6 +2284,11 @@
         async function removeUploadFile(path) {
             selectedFilesList = selectedFilesList.filter(p => p !== path);
             await api.saveConfig({ selected_files: selectedFilesList });
+            const stats = await api.getAutomationStats();
+            if (stats && stats.is_running) {
+                await api.requestNewChat();
+                appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
+            }
             renderUploadFilesPreviews();
             appendLog(`Removed file from queue.`, 'info');
         }
@@ -2289,6 +2299,11 @@
                 await api.clearAttachments();
                 selectedFilesList = [];
                 await api.saveConfig({ selected_files: [] });
+                const stats = await api.getAutomationStats();
+                if (stats && stats.is_running) {
+                    await api.requestNewChat();
+                    appendLog('Upload list changed. Will re-upload on next cycle.', 'info');
+                }
                 renderUploadFilesPreviews();
                 appendLog('All upload queue and attachments cleared.', 'success');
             } catch (err) {
