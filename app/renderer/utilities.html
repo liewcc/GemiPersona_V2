@@ -196,8 +196,11 @@
         }
 
         async function sanBrowseFile() {
+            // Reopen at the last SELECT IMAGE path. Uses its own 'sanLastPath' key,
+            // independent of setup.html's 'browsePath_*' memory, so the two never collide.
             const paths = await window.electronAPI.selectFile({
                 title: 'Select Image',
+                defaultPath: localStorage.getItem('sanLastPath') || undefined,
                 filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
                 properties: ['openFile']
             });
