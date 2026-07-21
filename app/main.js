@@ -405,7 +405,10 @@ function startEngine() {
     cwd: projectRoot,
     env: {
       ...process.env,
-      PLAYWRIGHT_BROWSERS_PATH: path.join(projectRoot, '.playwright_browsers')
+      PLAYWRIGHT_BROWSERS_PATH: path.join(projectRoot, '.playwright_browsers'),
+      // Conductor passes its env down to the engine, so this one setting drives
+      // both. Set "log_level": "DEBUG" in config.json for the verbose diagnostics.
+      GEMI_LOG_LEVEL: (loadConfig().log_level || 'INFO').toUpperCase()
     },
     stdio: ['ignore', 'pipe', 'pipe']   // stdin=ignore, stdout/stderr=pipe
   });

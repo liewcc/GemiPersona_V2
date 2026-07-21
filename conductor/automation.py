@@ -484,6 +484,11 @@ class AutomationManager:
                 logger.info(f"[automation] step: {name}")
                 asyncio.create_task(self.log_to_engine(f"[automation] step: {name}"))
 
+            def _note(msg):
+                """Log an outcome without touching current_step (the UI shows that)."""
+                logger.info(f"[automation] {msg}")
+                asyncio.create_task(self.log_to_engine(f"[automation] {msg}"))
+
             if self.ensure_service:
                 ok = await self.ensure_service()
                 if not ok:
@@ -567,6 +572,8 @@ class AutomationManager:
                                 if saved_paths:
                                     write_png_metadata(saved_paths, self.config)
                                     next_start = dl_data.get("next_start", dl_cfg["start"])
+                                    _note(f"saved {', '.join(os.path.basename(p) for p in saved_paths)} "
+                                          f"in {dl_cfg['save_dir']} (next number {next_start})")
                                     self.config["name_start"] = next_start
                                     # config.json owns the next filename number — persist it
                                     # every cycle, exactly like the manual Submit path does.

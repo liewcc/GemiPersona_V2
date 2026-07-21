@@ -19,7 +19,7 @@ handler.setFormatter(formatter)
 
 logging.basicConfig(
     handlers=[handler],
-    level=logging.INFO,
+    level=os.environ.get('GEMI_LOG_LEVEL', 'INFO').upper(),
     format='%(asctime)s [%(levelname)s] %(message)s'
 )
 logger = logging.getLogger('conductor')
