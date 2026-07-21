@@ -4,11 +4,15 @@ Direct API-based image generation — bypasses the browser engine entirely.
 """
 import os
 import io
+import sys
 import time
 import asyncio
 import threading
 from datetime import datetime
 from PIL import Image
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Gemi_Engine_V2'))
+from providers.gemini.sequences import resolve_next_number
 
 
 class GeminiAPIClient:
@@ -57,7 +61,7 @@ class GeminiAPIClient:
         """
         Generate a single image via Gemini API.
 
-        naming_cfg: {prefix: str, padding: int, start: int}
+        naming_cfg: {prefix: str, padding: int, start: int, gap_fill: bool}
         extra_meta: {prompt: str, ...} — embedded in PNG metadata
 
         Returns:
@@ -88,17 +92,17 @@ class GeminiAPIClient:
             padding = naming_cfg.get("padding", 2)
             start_idx = naming_cfg.get("start", 1)
 
+            gap_fill = naming_cfg.get("gap_fill", True)
+
             for part in response.parts:
                 if part.inline_data is not None:
                     image = part.as_image()
 
-                    # Find next available filename (same logic as browser_engine)
-                    while True:
-                        save_name = f"{prefix}{str(start_idx).zfill(padding)}.png"
-                        save_path = os.path.join(save_dir, save_name)
-                        if not os.path.exists(save_path):
-                            break
-                        start_idx += 1
+                    # Same naming rule as the browser path: config's number is
+                    # authoritative, collisions are stepped over, never overwritten.
+                    start_idx = resolve_next_number(save_dir, prefix, padding, start_idx, gap_fill)
+                    save_name = f"{prefix}{str(start_idx).zfill(padding)}.png"
+                    save_path = os.path.join(save_dir, save_name)
 
                     # Save with metadata
                     self._save_with_meta(image, save_path, extra_meta)
