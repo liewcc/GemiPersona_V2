@@ -565,7 +565,16 @@ class AutomationManager:
                                 saved_paths = dl_data.get("saved_paths", [])
                                 if saved_paths:
                                     write_png_metadata(saved_paths, self.config)
-                                    self.config["name_start"] = dl_data.get("next_start", dl_cfg["start"])
+                                    next_start = dl_data.get("next_start", dl_cfg["start"])
+                                    self.config["name_start"] = next_start
+                                    # config.json owns the next filename number — persist it
+                                    # every cycle, exactly like the manual Submit path does.
+                                    # Without this the number only lived in this snapshot and
+                                    # was lost on restart, so a later run reused old numbers.
+                                    try:
+                                        await self._post("/engine/config", {"name_start": next_start})
+                                    except Exception as cfg_err:
+                                        logger.warning(f"Failed to persist name_start={next_start}: {cfg_err}")
                                     self.automation_status["successes"] += 1
                                     self.automation_status["cycles"] += 1
 

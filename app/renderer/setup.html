@@ -2117,6 +2117,8 @@
         }
 
         async function buildCurrentConfig() {
+            // Naming fields go through config.json first — see startSetupAutomation().
+            await saveNamingFields();
             const currentConfig = await api.getConfig();
             currentConfig.selected_files = selectedFilesList;
             currentConfig.prompt = document.getElementById('promptTarget').value;
@@ -2665,7 +2667,11 @@
                 const modeEl = document.querySelector('input[name="stopCondition"]:checked');
                 const mode = modeEl ? modeEl.value : 'rounds';
                 const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
-                
+
+                // Persist the naming fields first: the engine reads track_last_file_num
+                // from config.json, so folder/number/toggle must agree there before the
+                // run starts — not just inside the snapshot we pass to the conductor.
+                await saveNamingFields();
                 const currentConfig = await api.getConfig();
                 currentConfig.selected_files = selectedFilesList;
                 currentConfig.prompt = document.getElementById('promptTarget').value;
@@ -2673,13 +2679,7 @@
                 currentConfig.selected_sub_tool = document.getElementById('subToolSelect').value;
                 currentConfig.selected_model = document.getElementById('modelSelect').value;
                 currentConfig.selected_thinking_level = document.getElementById('thinkingLevelSelect').value;
-                currentConfig.save_dir = document.getElementById('saveDirInput').value;
-                currentConfig.name_prefix = document.getElementById('filePrefixInput').value;
-                currentConfig.name_padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
-                const startVal = parseInt(document.getElementById('nameStartInput').value);
-                currentConfig.name_start = isNaN(startVal) ? 1 : startVal;
-                currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
-                
+
                 const res = await api.startAutomation(mode, goal, currentConfig);
                 appendLog(`Start Automation result: ${res.status}`, 'success');
                 updateAutomationStats();
@@ -2724,7 +2724,11 @@
                 const modeEl = document.querySelector('input[name="stopCondition"]:checked');
                 const mode = modeEl ? modeEl.value : 'rounds';
                 const goal = parseInt(document.getElementById('autoGoalInput').value) || 1;
-                
+
+                // Persist the naming fields first: the engine reads track_last_file_num
+                // from config.json, so folder/number/toggle must agree there before the
+                // run starts — not just inside the snapshot we pass to the conductor.
+                await saveNamingFields();
                 const currentConfig = await api.getConfig();
                 currentConfig.selected_files = selectedFilesList;
                 currentConfig.prompt = document.getElementById('promptTarget').value;
@@ -2732,13 +2736,7 @@
                 currentConfig.selected_sub_tool = document.getElementById('subToolSelect').value;
                 currentConfig.selected_model = document.getElementById('modelSelect').value;
                 currentConfig.selected_thinking_level = document.getElementById('thinkingLevelSelect').value;
-                currentConfig.save_dir = document.getElementById('saveDirInput').value;
-                currentConfig.name_prefix = document.getElementById('filePrefixInput').value;
-                currentConfig.name_padding = parseInt(document.getElementById('namePaddingInput').value) || 2;
-                const startVal = parseInt(document.getElementById('nameStartInput').value);
-                currentConfig.name_start = isNaN(startVal) ? 1 : startVal;
-                currentConfig.track_last_file_num = document.getElementById('trackLastFileNumToggle').checked;
-                
+
                 const res = await api.continueAutomation(mode, goal, currentConfig, clearPending);
                 if (res.status === 'goal_reached') {
                     alert(res.message || 'Goal Protection: The target goal has already been reached. Please increase the Target Goal to continue.');
@@ -2834,6 +2832,19 @@
                             const saveDir = document.getElementById('saveDirInput').value || '';
                             const silent = localConfig.notification_sound_enabled === false;
                             window.electronAPI.notifyDownload(delta, saveDir, silent);
+                        }
+                    }
+                    // Automation advances name_start in config.json each cycle; mirror it
+                    // into the Start No. box so the UI never sends back a stale number.
+                    if (currentSuccesses > _lastKnownSuccesses) {
+                        const startEl = document.getElementById('nameStartInput');
+                        if (startEl && document.activeElement !== startEl) {
+                            try {
+                                const cfg = await api.getConfig();
+                                if (cfg && cfg.name_start !== undefined && cfg.name_start !== null) {
+                                    startEl.value = cfg.name_start;
+                                }
+                            } catch (e) { /* stats poll must never break on this */ }
                         }
                     }
                     _lastKnownSuccesses = currentSuccesses;
