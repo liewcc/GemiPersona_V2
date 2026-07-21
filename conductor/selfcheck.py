@@ -39,7 +39,7 @@ def main():
             print(f"[FAIL] Failed to import {name}: {e}")
             sys.exit(1)
 
-    for mod in ("gemini_api_client", "image_notifier", "automation"):
+    for mod in ("image_notifier", "automation"):
         try_import(mod)
 
     # Classification test
