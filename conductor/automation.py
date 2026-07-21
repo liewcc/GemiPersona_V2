@@ -369,6 +369,11 @@ class AutomationManager:
         if thinking_to_apply is None:
             thinking_to_apply = config.get("selected_thinking_level")
         
+        # Live-read: the UI saves selected_files to config.json mid-run, so the
+        # snapshot taken at start() would resend the stale list. Read outside the
+        # try — if the settings block throws before this, the attach guard below
+        # must still know what was supposed to be on the page.
+        has_files = _load_root_config().get("selected_files") or config.get("selected_files")
         try:
             sel_model = cfg.get("selected_model")
             if sel_model is None:
@@ -443,15 +448,31 @@ class AutomationManager:
                 "thinking_level": thinking_to_apply
             })
             
-            # Live-read: the UI saves selected_files to config.json mid-run;
-            # the snapshot taken at start() would resend the stale list.
-            has_files = _load_root_config().get("selected_files") or config.get("selected_files")
             if has_files:
                 _step("attach_files")
                 for f_path in has_files:
                     await self._post("/browser/file/add", {"path": f_path})
         except Exception as e:
             logger.warning(f"Settings setup failed: {e}")
+
+        # Ask the page what actually landed rather than trusting the POSTs: a
+        # signed-out profile fails every upload while answering 200 everywhere
+        # else. Submitting regardless spends a cycle — and a quota hit — on a
+        # generation with none of its reference images.
+        if has_files:
+            attached = 0
+            try:
+                resp = await self._get("/browser/current_attachments")
+                attached = len(resp.json().get("attachments", []))
+            except Exception as e:
+                logger.warning(f"attachment verification failed: {e}")
+            if attached < len(has_files):
+                logger.warning(f"[automation] attach failed: {attached}/{len(has_files)} "
+                               f"files on the page - skipping cycle")
+                asyncio.create_task(self.log_to_engine(
+                    f"[automation] attach failed: {attached}/{len(has_files)} "
+                    f"files on the page - skipping cycle"))
+                return {"aborted": "attach_failed"}
 
         _step("prompt")
         ratio, ar_dynamic, ar_idx = _resolve_aspect_ratio(_load_root_config())
@@ -539,8 +560,15 @@ class AutomationManager:
                 
                 try:
                     if is_initial:
-                        await self._init_session(self.config)
+                        init = await self._init_session(self.config)
                         if self._stop_event.is_set(): break
+                        if (init or {}).get("aborted"):
+                            # Same bounded path as a failed redo: the reset streak
+                            # feeds loop-control, which switches profile or stops
+                            # rather than letting a broken session spin forever.
+                            self._record_reset()
+                            self._needs_new_chat = True
+                            continue
                         self._needs_new_chat = False
                     else:
                         _step("redo")

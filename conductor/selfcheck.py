@@ -2,6 +2,7 @@ import sys
 import os
 import json
 import time
+import logging
 from fastapi.testclient import TestClient
 
 # Add current dir to path to allow imports
@@ -207,6 +208,86 @@ def main():
             "rotating a second time must replace the previous generation, not fail"
         )
     print("[OK] engine_svc.out rotation passed")
+
+    # ── Attach guard: never submit a cycle with missing reference images ────────
+    # A signed-out profile fails every upload while answering 200 elsewhere, so the
+    # guard trusts the page's attachment count, not the POST results.
+    print("Testing attach guard...")
+    import asyncio as _asyncio
+    import automation as _auto
+    from automation import AutomationManager
+
+    # This check deliberately drives the failure path, which logs at WARNING on the
+    # shared 'conductor' logger. Left alone it writes convincing "attach failed"
+    # lines into the live conductor.log — a false trail for whoever debugs next.
+    logging.getLogger('conductor').setLevel(logging.CRITICAL)
+
+    class _Resp:
+        def __init__(self, payload): self._payload = payload
+        def json(self): return self._payload
+
+    def _run_guard(desired, on_page, raise_on_get=False, break_settings=False):
+        """Drive _init_session with a stubbed engine; return its verdict."""
+        mgr = AutomationManager.__new__(AutomationManager)
+        mgr.automation_status = {"current_step": None, "current_account_id": None}
+        mgr._stop_event = _asyncio.Event()
+        mgr._needs_discovery = False
+        mgr._ar_ratio = mgr._ar_dynamic = mgr._ar_idx = None
+        posted = []
+
+        async def _post(path, json_data=None):
+            posted.append(path)
+            if break_settings and path == "/browser/apply_settings":
+                raise RuntimeError("settings step blew up")
+            return _Resp({"status": "success"})
+
+        async def _get(path):
+            if raise_on_get:
+                raise RuntimeError("engine unreachable")
+            return _Resp({"attachments": ["a"] * on_page})
+
+        async def _log(msg, level="info"): return None
+        mgr._post, mgr._get, mgr.log_to_engine = _post, _get, _log
+        mgr.get_engine_url = lambda: "http://127.0.0.1:0"
+        mgr.ensure_service = None
+
+        # _init_session live-reads config.json; pin it so the check does not
+        # depend on whatever the user currently has selected.
+        real_loader = _auto._load_root_config
+        _auto._load_root_config = lambda: {"selected_files": list(desired)}
+        try:
+            out = _asyncio.new_event_loop().run_until_complete(
+                mgr._init_session({"selected_files": list(desired), "prompt": "p"}))
+        finally:
+            _auto._load_root_config = real_loader
+        return out, posted
+
+    _files = ["a.png", "b.png", "c.png"]
+    out, posted = _run_guard(_files, on_page=0)
+    assert out.get("aborted") == "attach_failed", "0 of 3 attached must abort the cycle"
+    assert "/browser/submit" not in posted, "aborted cycle must not submit"
+
+    out, posted = _run_guard(_files, on_page=2)
+    assert out.get("aborted") == "attach_failed", "a partial attach must abort too"
+
+    out, posted = _run_guard(_files, on_page=3)
+    assert not out.get("aborted"), "a complete attach must proceed"
+    assert "/browser/submit" in posted, "a complete attach must reach submit"
+
+    out, posted = _run_guard([], on_page=0)
+    assert not out.get("aborted"), "no reference images configured is not a failure"
+
+    out, posted = _run_guard(_files, on_page=3, raise_on_get=True)
+    assert out.get("aborted") == "attach_failed", (
+        "an unverifiable attach must abort, not submit blind"
+    )
+
+    out, posted = _run_guard(_files, on_page=0, break_settings=True)
+    assert out.get("aborted") == "attach_failed", (
+        "the guard must still fire when the settings block throws before attaching"
+    )
+    assert "/browser/submit" not in posted, "aborted cycle must not submit"
+    print("[OK] Attach guard passed")
 
     print("[OK] All selfchecks passed!")
 
