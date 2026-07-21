@@ -2526,7 +2526,7 @@
                     const url = browserStatus.url || '';
                     const uploadPath = selectedFilesList.join(', ');
                     
-                    const naming = { prefix, padding, start, gap_fill: document.getElementById('trackLastFileNumToggle').checked };
+                    const naming = { prefix, padding, start, track_last: document.getElementById('trackLastFileNumToggle').checked };
                     const meta = { aspect_ratio: ratioPrefix, prompt: cleanPrompt, url, upload_path: uploadPath };
                     
                     const dlResp = await api.downloadImages(saveDir, naming, meta);
@@ -2605,7 +2605,7 @@
                         const url = browserStatus.url || '';
                         const uploadPath = selectedFilesList.join(', ');
                         
-                        const naming = { prefix, padding, start, gap_fill: document.getElementById('trackLastFileNumToggle').checked };
+                        const naming = { prefix, padding, start, track_last: document.getElementById('trackLastFileNumToggle').checked };
                         const meta = { aspect_ratio: arVal, prompt: cleanPrompt, url, upload_path: uploadPath };
                         
                         const dlResp = await api.downloadImages(saveDir, naming, meta);

@@ -556,7 +556,7 @@ class AutomationManager:
                                 "prefix": self.config.get("name_prefix", ""),
                                 "padding": self.config.get("name_padding", 2),
                                 "start": self.config.get("name_start", 1),
-                                "gap_fill": bool(self.config.get("track_last_file_num", False))
+                                "track_last": bool(self.config.get("track_last_file_num", False))
                             }
                             _step("download")
                             dl_resp = await self._post("/browser/download", dl_cfg)
