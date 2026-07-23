@@ -289,6 +289,67 @@ def main():
     assert "/browser/submit" not in posted, "aborted cycle must not submit"
     print("[OK] Attach guard passed")
 
+    print("Testing discovery persistence...")
+
+    def _run_discovery(scan_data):
+        """Drive _init_session with a scan pending; return what got POSTed to
+        /engine/config (the setup UI reads config.json for its menu options)."""
+        mgr = AutomationManager.__new__(AutomationManager)
+        mgr.automation_status = {"current_step": None, "current_account_id": None}
+        mgr._stop_event = _asyncio.Event()
+        mgr._needs_discovery = True
+        mgr._ar_ratio = mgr._ar_dynamic = mgr._ar_idx = None
+        written = []
+
+        async def _post(path, json_data=None):
+            if path == "/engine/config" and "discovery" in (json_data or {}):
+                written.append(json_data["discovery"])
+            if path == "/browser/discover":
+                return _Resp({"status": "success", "data": scan_data})
+            return _Resp({"status": "success"})
+
+        async def _get(path):
+            return _Resp({"attachments": []})
+
+        async def _log(msg, level="info"): return None
+        mgr._post, mgr._get, mgr.log_to_engine = _post, _get, _log
+        mgr.get_engine_url = lambda: "http://127.0.0.1:0"
+        mgr.ensure_service = None
+
+        real_loader = _auto._load_root_config
+        _auto._load_root_config = lambda: {"selected_files": []}
+        try:
+            _asyncio.new_event_loop().run_until_complete(
+                mgr._init_session({"selected_files": [], "prompt": "p"}))
+        finally:
+            _auto._load_root_config = real_loader
+        return written
+
+    _good = {"models": ["3.0 Pro", "3.0 Flash"], "thinking_levels": ["High"],
+             "main_tools": ["Create images"], "sub_tools": {"More tools": ["Deep Research"]}}
+    written = _run_discovery(_good)
+    assert len(written) == 1, "a good scan must be persisted for the UI exactly once"
+    assert written[0]["available_models"] == _good["models"], "model list must reach config.json"
+    assert written[0]["available_tools"] == _good["main_tools"], "tool list must reach config.json"
+    assert written[0]["sub_tools"] == _good["sub_tools"], "sub-tool map must reach config.json"
+    assert written[0].get("last_updated"), "the UI shows this stamp to flag a stale menu"
+
+    # Selector drift returns success with nothing found. Persisting that would
+    # blank the menu on next launch — the exact thing this feature prevents.
+    assert _run_discovery({"models": [], "thinking_levels": [],
+                           "main_tools": [], "sub_tools": {}}) == [], (
+        "an empty scan must not overwrite the last good menu")
+
+    # The gemini provider used to return its own {"status","data"} envelope,
+    # which engine_service wrapped again. One unwrap then landed on the inner
+    # envelope, so models was always empty: no menu was ever saved and every
+    # model/tool check below silently passed. Nothing asserted on the payload's
+    # shape, so it went unnoticed — pin it here.
+    assert _run_discovery({"status": "success", "data": _good}) == [], (
+        "a double-wrapped payload has no models at the top level and must not "
+        "be mistaken for a good scan")
+    print("[OK] Discovery persistence passed")
+
     print("[OK] All selfchecks passed!")
 
 if __name__ == "__main__":

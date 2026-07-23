@@ -272,6 +272,16 @@ class AutomationManager:
         async with httpx.AsyncClient(timeout=300.0) as client:
             return await client.get(url)
 
+    async def _drop_selection(self, kind: str, value: str):
+        """A saved selection is not on the page any more, so it is silently not
+        applied and the web app falls back to its own default. Say so in the run
+        log — at debug level the user had no way to learn their chosen model was
+        never used."""
+        msg = (f"[automation] selected {kind} '{value}' is no longer in the "
+               f"web app's menu — leaving it unset for this run")
+        logger.warning(msg)
+        await self.log_to_engine(msg, "warning")
+
     async def log_to_engine(self, message: str, level: str = "info"):
         try:
             await self._post("/engine/log", {"message": message, "level": level})
@@ -410,18 +420,43 @@ class AutomationManager:
                 thinking_levels = discovered.get("thinking_levels", [])
                 # Web tool set is static; never rescan for the rest of this
                 # conductor process (redo / continue / account switch included).
-                self._needs_discovery = False
+                # Gated on a scan that found something: clearing the flag on an
+                # empty scan (selector drift) poisoned the whole process — it
+                # would never get another chance to scan, and every model/tool
+                # check below silently degrades to a no-op when models is empty.
+                if models:
+                    self._needs_discovery = False
+
+                # Persist the scan so the setup UI has menu options to show
+                # before any scan has run this session (otherwise the dropdowns
+                # only ever hold the saved selection). Display-only: the checks
+                # below still validate against this live scan, never against the
+                # stored copy, which may predate a menu change on the web app.
+                # Written only when the scan actually found models — a success
+                # with empty results (selector drift) must not wipe the last
+                # good menu.
+                if models:
+                    try:
+                        await self._post("/engine/config", {"discovery": {
+                            "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "available_models": models,
+                            "available_thinking_levels": thinking_levels,
+                            "available_tools": main_tools,
+                            "sub_tools": sub_tools
+                        }})
+                    except Exception as disc_err:
+                        logger.warning(f"Failed to persist discovery for the UI: {disc_err}")
 
                 if sel_model and models:
                     if sel_model not in models:
-                        logger.debug(f"Selected model '{sel_model}' not found in live scan. Leaving empty.")
+                        await self._drop_selection("model", sel_model)
                         model_to_apply = None
-                        
+
                 if sel_thinking and thinking_levels:
                     if sel_thinking not in thinking_levels:
-                        logger.debug(f"Selected thinking level '{sel_thinking}' not found in live scan. Leaving empty.")
+                        await self._drop_selection("thinking level", sel_thinking)
                         thinking_to_apply = None
-                        
+
                 if sel_tool and main_tools:
                     if sel_tool in main_tools:
                         if sel_tool in sub_tools:
@@ -429,17 +464,20 @@ class AutomationManager:
                                 if sel_sub_tool in sub_tools[sel_tool]:
                                     tool_to_apply = sel_sub_tool
                                 else:
-                                    logger.debug(f"Selected sub-tool '{sel_sub_tool}' not found under '{sel_tool}'. Leaving empty.")
+                                    await self._drop_selection(f"sub-tool under '{sel_tool}'", sel_sub_tool)
                                     tool_to_apply = None
                             else:
                                 tool_to_apply = sel_sub_tool
                         else:
                             tool_to_apply = sel_tool
                     else:
-                        logger.debug(f"Selected tool '{sel_tool}' not found in live scan. Leaving empty.")
+                        await self._drop_selection("tool", sel_tool)
                         tool_to_apply = None
             elif discovery_res.get("status") != "skipped":
-                logger.warning(f"Discovery scan failed: {discovery_res.get('message')}. Applying settings directly from config.")
+                # A provider-level failure now surfaces as HTTP 500 with FastAPI's
+                # {"detail": ...}, so fall back to that key or the reason is lost.
+                reason = discovery_res.get("message") or discovery_res.get("detail")
+                logger.warning(f"Discovery scan failed: {reason}. Applying settings directly from config.")
             
             _step("apply_settings")
             await self._post("/browser/apply_settings", {

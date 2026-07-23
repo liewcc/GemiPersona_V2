@@ -361,7 +361,10 @@
 
                     <!-- TOOL & MODEL SELECTION -->
                     <div class="card glass mb-0 p-20">
-                        <div style="color: #a0a0ff; font-weight: 600; font-size: 0.85em; margin-bottom: 15px;">TOOL & MODEL SELECTION</div>
+                        <div class="d-flex justify-between" style="margin-bottom: 15px; align-items: baseline;">
+                            <span style="color: #a0a0ff; font-weight: 600; font-size: 0.85em;">TOOL & MODEL SELECTION</span>
+                            <span id="discoveryStamp" style="color: #8b949e; font-size: 0.7em;"></span>
+                        </div>
                         <div class="d-flex flex-column gap-15">
                             <!-- Tool & Sub Menu Row -->
                             <div class="d-flex gap-15">
@@ -395,7 +398,7 @@
                             </div>
                             <!-- Action Buttons Row -->
                             <div class="d-flex gap-10 justify-end" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 5px;">
-                                <button class="btn text-small" onclick="discoverCapabilities()" title="Discover model/tool profiles">🔄 Discover</button>
+                                <button class="btn text-small" id="btnDiscover" onclick="discoverCapabilities()" title="Discover model/tool profiles">🔄 Discover</button>
                                 <button class="btn text-small" onclick="saveToolModelSettings()">💾 Save</button>
                                 <button class="btn btn-primary text-small" id="btnApplySettings" onclick="applyToolModelSettings()">🚀 Apply</button>
                             </div>
@@ -2023,7 +2026,18 @@
             const availModels = discovery.available_models || [];
             const availTools = discovery.available_tools || [];
             const availThinkingLevels = discovery.available_thinking_levels || [];
-            
+
+            // The stored menu is a cache of the last successful scan, so it can
+            // predate a change on the web app. Show when it was taken instead of
+            // locking the dropdowns: what actually gets applied is validated
+            // against a fresh scan at run time, not against this copy.
+            const stamp = document.getElementById('discoveryStamp');
+            if (stamp) {
+                stamp.textContent = discovery.last_updated
+                    ? `menu scanned ${discovery.last_updated}`
+                    : 'menu never scanned';
+            }
+
             const selModel = config.selected_model || '';
             const selTool = config.selected_tool || '';
             const selSubTool = config.selected_sub_tool || '';
@@ -2094,7 +2108,11 @@
         async function discoverCapabilities() {
             try {
                 appendLog('Discovering available models and tools...', 'info');
-                await api.discoverCapabilities();
+                const res = await api.discoverCapabilities();
+                if (res && res.status === 'error') {
+                    appendLog(`Discovery skipped: ${res.message}`, 'warn');
+                    return;
+                }
                 appendLog('Discovery complete.', 'success');
                 loadConfigFromServer();
             } catch (err) {
@@ -3117,6 +3135,16 @@
             if (btnUrlSend) btnUrlSend.disabled = is_running;
             if (btnSubmitPrompt) btnSubmitPrompt.disabled = is_running;
             if (btnUploadFile) btnUploadFile.disabled = is_running;
+
+            // A manual scan drives the same page the loop is using; the conductor
+            // rejects it outright while running, so grey it out to match.
+            const btnDiscover = document.getElementById('btnDiscover');
+            if (btnDiscover) {
+                btnDiscover.disabled = is_running;
+                btnDiscover.title = is_running
+                    ? 'Automation is running — its own scan owns the page'
+                    : 'Discover model/tool profiles';
+            }
         }
 
         async function resetLcTimeTimer() {

@@ -369,6 +369,65 @@ async def profiles_save_ep(data: dict = Body(...)):
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
+@app.post("/browser/discover")
+async def discover_ep(request: Request):
+    # Explicit handler rather than the catch-all proxy for two reasons: the scan
+    # drives the same page the automation loop does (opening the model drawer
+    # mid-run would fight it, and the Escape it presses to close can dismiss a
+    # dialog the loop is waiting on), and the result has to be persisted for the
+    # setup UI's dropdowns. The automation loop posts to the engine directly, so
+    # it does its own persisting — this covers the manual Discover button.
+    if automation_manager.automation_status["is_running"]:
+        # 200 with status:"error" mirrors the engine's own discover contract —
+        # api.js turns any non-2xx into a bare "HTTP error! status: N" and drops
+        # the body, which would hide the reason from the user.
+        return JSONResponse(content={
+            "status": "error",
+            "message": "Automation is running — its own scan owns the page. Stop the loop to rescan."
+        })
+
+    await ensure_service()
+    url = get_engine_url() + "/browser/discover"
+    query = request.url.query
+    if query:
+        url += f"?{query}"
+    try:
+        async with httpx.AsyncClient(timeout=320.0) as client:
+            resp = await client.post(url, content=await request.body(),
+                                     headers={"content-type": "application/json"})
+            payload = resp.json()
+
+            # A scan that throws comes back as HTTP 500 {"detail": ...}. api.js
+            # drops the body of any non-2xx, so restate it in the envelope the
+            # UI already reads or the user just sees "HTTP error! status: 500".
+            if "status" not in payload:
+                return JSONResponse(content={
+                    "status": "error",
+                    "message": payload.get("detail", "Discovery failed")
+                })
+
+            # Persist only a scan that found models: a success with empty results
+            # means selector drift, and overwriting would leave the UI with a
+            # blank menu. Written through the engine's config endpoint so every
+            # config.json write shares one code path.
+            data = payload.get("data") or {}
+            if payload.get("status") == "success" and data.get("models"):
+                try:
+                    await client.post(get_engine_url() + "/engine/config", json={"discovery": {
+                        "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "available_models": data.get("models", []),
+                        "available_thinking_levels": data.get("thinking_levels", []),
+                        "available_tools": data.get("main_tools", []),
+                        "sub_tools": data.get("sub_tools", {})
+                    }})
+                except Exception as e:
+                    logger.warning(f"Failed to persist discovery for the UI: {e}")
+    except Exception as e:
+        logger.error(f"Discover proxy error: {e}")
+        return JSONResponse(status_code=502, content={"status": "error", "message": str(e)})
+
+    return JSONResponse(status_code=resp.status_code, content=payload)
+
 @app.post("/browser/attach_files")
 async def attach_files_ep(file_paths: list = Body(...)):
     # Sync wrapper: converge engine attachments to the desired list via file/add + file/remove.
