@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage, Not
 const path = require('path');
 const fs = require('fs');
 const { spawn, execFile } = require('child_process');
+const http = require('http');
 
 let mainWindow;
 let engineProcess;   // NOTE: this is the CONDUCTOR process in V2 (it supervises the engine itself)
@@ -475,6 +476,57 @@ ipcMain.handle('stop-engine-service', async () => {
   } catch (error) {
     return { status: 'error', error: error.message };
   }
+});
+
+ipcMain.handle('stop-all', async () => {
+  return new Promise((resolve) => {
+    const postData = '{}';
+    const options = {
+      hostname: '127.0.0.1',
+      port: 18101,
+      path: '/browser/stop_all',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 320000
+    };
+
+    let resolved = false;
+    const safeResolve = (val) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(val);
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          safeResolve(json);
+        } catch (err) {
+          safeResolve({ status: 'error', message: String(err) });
+        }
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy(new Error('Request timed out'));
+    });
+
+    req.on('error', (err) => {
+      safeResolve({ status: 'error', message: String(err) });
+    });
+
+    req.write(postData);
+    req.end();
+  });
 });
 
 ipcMain.handle('get-engine-service-status', async () => {

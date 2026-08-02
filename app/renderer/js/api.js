@@ -47,6 +47,10 @@ const api = {
         return this.request('/engine/stop', 'POST');
     },
 
+    stopAll() {
+        return this.request('/browser/stop_all', 'POST');
+    },
+
     startRegistrationMode(payload = {}) {
         return this.request('/engine/start_registration', 'POST', payload);
     },

@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   startEngineService: () => ipcRenderer.invoke('start-engine-service'),
   stopEngineService: () => ipcRenderer.invoke('stop-engine-service'),
+  stopAll: () => ipcRenderer.invoke('stop-all'),
   getEngineServiceStatus: () => ipcRenderer.invoke('get-engine-service-status'),
 
   // Direct config file access — works even when the Python engine is offline

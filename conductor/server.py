@@ -515,6 +515,22 @@ async def reset_session(req: ResetSessionRequest):
         logger.error(f"reset_session failed: {e}")
         return JSONResponse(status_code=500, content={"detail": str(e)})
 
+@app.post("/browser/stop_all")
+async def stop_all():
+    """Atomically stop the automation loop and the browser without queueing."""
+    automation_manager.stop()
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(get_engine_url() + "/engine/interrupt")
+    except Exception as e:
+        logger.warning(f"stop_all: interrupt failed: {e}")
+    try:
+        async with httpx.AsyncClient(timeout=310.0) as client:
+            await client.post(get_engine_url() + "/engine/stop", json={"force": True})
+    except Exception as e:
+        logger.warning(f"stop_all: stop failed: {e}")
+    return {"status": "success"}
+
 @app.api_route("/engine/{path:path}", methods=["GET", "POST"])
 @app.api_route("/browser/{path:path}", methods=["GET", "POST"])
 async def proxy_to_engine(request: Request, path: str):

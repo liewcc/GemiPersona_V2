@@ -1159,22 +1159,11 @@
                     await window.electronAPI.startEngineService();
                     appendLog('Engine service started.', 'success');
                 } else {
-                    if (!await stopAutomationIfRunning()) return;
-                    appendLog('Stopping engine and browser...', 'warn');
-                    // Stop browser first gracefully if running
+                    appendLog('Stopping engine, browser and automation...', 'warn');
                     try {
-                        const svcStatus = await window.electronAPI.getEngineServiceStatus();
-                        if (svcStatus.running) {
-                            try {
-                                appendLog('Closing browser gracefully...', 'info');
-                                await api.stopEngine();
-                            } catch(e) {
-                                console.log("Failed to stop browser gracefully:", e);
-                            }
-                            await new Promise(r => setTimeout(r, 1000));
-                        }
-                    } catch (e) {
-                        console.error("Error stopping browser gracefully before engine stop:", e);
+                        await window.electronAPI.stopAll();
+                    } catch(e) {
+                        appendLog('Stop browser failed: ' + e.message, 'warn');
                     }
                     await window.electronAPI.stopEngineService();
                     appendLog('Engine and browser stopped.', 'success');
@@ -1204,14 +1193,16 @@
                     await api.startEngine({ headless, active_user: _cfg.active_user || null, profile_name: _cfg.active_profile || null, active_service: _cfg.active_service || null });
                     appendLog('Browser started.', 'success');
                 } else {
-                    if (!await stopAutomationIfRunning()) return;
-                    // Set flag BEFORE the async stop so any concurrent poll
-                    // that fires during the await cannot see autoStartedBrowser=false
-                    // and trigger an unwanted autostart.
+                    const btn = document.getElementById('browserCardBtn');
+                    if (btn) { btn.disabled = true; btn.textContent = 'Stopping...'; }
                     autoStartedBrowser = true;
                     sessionStorage.setItem('autoStartedBrowser', 'true');
-                    appendLog('Stopping browser...', 'warn');
-                    await api.stopEngine();
+                    appendLog('Stopping browser and automation...', 'warn');
+                    try {
+                        await window.electronAPI.stopAll();
+                    } catch(e) {
+                        appendLog('Stop failed: ' + e.message, 'error');
+                    }
                     appendLog('Browser stopped.', 'success');
                 }
                 updateAccountStatus();
